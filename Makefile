@@ -31,18 +31,18 @@ dev: ## Start development server
 		python scripts/run_hub.py --dev --add-all-servers; \
 	fi
 
-test: ## Run tests
+test: ## Run offline tests
 	@if [ -d "venv" ]; then \
-		source venv/bin/activate && python -m pytest tests/ --offline; \
+		source venv/bin/activate && python tests/test_mcp_hub.py --offline; \
 	else \
-		python -m pytest tests/ --offline; \
+		python tests/test_mcp_hub.py --offline; \
 	fi
 
 test-online: ## Run online tests (requires running server)
 	@if [ -d "venv" ]; then \
-		source venv/bin/activate && python -m pytest tests/; \
+		source venv/bin/activate && python tests/test_mcp_hub.py; \
 	else \
-		python -m pytest tests/; \
+		python tests/test_mcp_hub.py; \
 	fi
 
 clean: ## Clean up Python cache files

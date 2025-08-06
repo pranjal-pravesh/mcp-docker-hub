@@ -77,7 +77,8 @@ make setup
 make dev
 
 # Run tests
-make test
+make test          # Offline tests
+make test-online   # Online tests (requires running server)
 ```
 
 ### Deployment

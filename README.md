@@ -169,7 +169,7 @@ python scripts/run_hub.py --add-all-servers
 python tests/mcp_hub_client.py --demo
 
 # Run tests
-python -m pytest tests/ --offline
+python tests/test_mcp_hub.py --offline
 ```
 
 ## 🔒 Security
