@@ -299,6 +299,126 @@ class MCPHubServer:
                 return {"message": f"Wolfram Alpha server added (using {'Docker' if use_docker else 'NPX'})"}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
+        
+        # New dynamic Docker MCP server management endpoints
+        @self.app.post("/servers/add-docker")
+        async def add_docker_server(
+            name: str,
+            docker_image: str,
+            transport: str = "stdio",
+            env_vars: Dict[str, str] = None,
+            ports: List[str] = None,
+            volumes: List[str] = None,
+            health_check_url: str = None,
+            health_check_timeout: int = 30
+        ):
+            """Add any Docker MCP server dynamically"""
+            try:
+                self.mcp_manager.add_docker_mcp_server(
+                    name=name,
+                    docker_image=docker_image,
+                    env_vars=env_vars or {},
+                    transport=transport,
+                    ports=ports,
+                    volumes=volumes,
+                    health_check_url=health_check_url,
+                    health_check_timeout=health_check_timeout
+                )
+                return {"message": f"Docker MCP server '{name}' added successfully"}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.delete("/servers/{server_name}")
+        async def remove_server(server_name: str):
+            """Remove an MCP server configuration"""
+            try:
+                # Stop the server if it's running
+                if server_name in self.mcp_manager.active_connections:
+                    await self.mcp_manager.stop_server(server_name)
+                
+                # Remove the configuration
+                success = self.mcp_manager.remove_server(server_name)
+                if success:
+                    return {"message": f"Server '{server_name}' removed successfully"}
+                else:
+                    raise HTTPException(status_code=404, detail=f"Server '{server_name}' not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/servers/configured")
+        async def list_configured_servers():
+            """List all configured server names"""
+            try:
+                servers = self.mcp_manager.list_configured_servers()
+                return {"servers": servers, "count": len(servers)}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/servers/config/{server_name}")
+        async def get_server_config(server_name: str):
+            """Get configuration for a specific server"""
+            try:
+                config = self.mcp_manager.get_server_config(server_name)
+                if config:
+                    return {
+                        "name": config.name,
+                        "docker_image": getattr(config, 'docker_image', None),
+                        "transport": config.transport,
+                        "env_vars": config.env,
+                        "ports": getattr(config, 'docker_ports', None),
+                        "volumes": getattr(config, 'docker_volumes', None),
+                        "health_check_url": getattr(config, 'health_check_url', None)
+                    }
+                else:
+                    raise HTTPException(status_code=404, detail=f"Server '{server_name}' not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/servers/load-config")
+        async def load_servers_from_config(config_file: str = "configs/mcp_servers.json"):
+            """Load server configurations from JSON file"""
+            try:
+                results = self.mcp_manager.load_servers_from_config(config_file)
+                success_count = sum(1 for success in results.values() if success)
+                total_count = len(results)
+                
+                return {
+                    "message": f"Loaded {success_count}/{total_count} servers from config",
+                    "results": results
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/servers/save-config")
+        async def save_servers_to_config(config_file: str = "configs/mcp_servers.json"):
+            """Save current server configurations to JSON file"""
+            try:
+                success = self.mcp_manager.save_servers_to_config(config_file)
+                if success:
+                    return {"message": f"Server configurations saved to {config_file}"}
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to save configuration")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/servers/check-availability")
+        async def check_server_availability(config_file: str = "configs/mcp_servers.json"):
+            """Check which servers are available based on environment variables"""
+            try:
+                availability = self.mcp_manager.check_available_servers(config_file)
+                
+                # Count available and unavailable servers
+                available_count = sum(1 for info in availability.values() if info["available"])
+                total_count = len(availability)
+                
+                return {
+                    "total_servers": total_count,
+                    "available_servers": available_count,
+                    "unavailable_servers": total_count - available_count,
+                    "servers": availability
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
     
     async def start(self):
         """Start the hub server"""
@@ -328,14 +448,35 @@ async def main():
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
     parser.add_argument("--add-all-servers", action="store_true", help="Add all available servers on startup")
+    parser.add_argument("--load-config", action="store_true", help="Load servers from config file on startup")
+    parser.add_argument("--config-file", default="configs/mcp_servers.json", help="Path to server configuration file")
     
     args = parser.parse_args()
     
     # Create and start hub server
     hub = MCPHubServer(host=args.host, port=args.port)
     
-    # Add servers if requested
-    if args.add_all_servers:
+    # Load servers from configuration file if requested
+    if args.load_config:
+        logger.info(f"Loading servers from configuration file: {args.config_file}")
+        try:
+            results = hub.mcp_manager.load_servers_from_config(args.config_file)
+            success_count = sum(1 for success in results.values() if success)
+            total_count = len(results)
+            logger.info(f"Loaded {success_count}/{total_count} servers from configuration")
+            
+            # Start all loaded servers
+            if results:
+                logger.info("Starting all loaded servers...")
+                start_results = await hub.mcp_manager.start_all_servers()
+                started_count = sum(1 for success in start_results.values() if success)
+                logger.info(f"Started {started_count}/{len(start_results)} servers")
+                
+        except Exception as e:
+            logger.warning(f"Failed to load servers from configuration: {e}")
+    
+    # Add legacy servers if requested
+    elif args.add_all_servers:
         logger.info("Adding all available servers...")
         try:
             hub.mcp_manager.add_slack_server()

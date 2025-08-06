@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import os
 from dotenv import load_dotenv
 from .tool_adapter import ToolHub, ProtocolType
+import re
 
 # Load environment variables
 load_dotenv()
@@ -27,6 +28,11 @@ class MCPServer:
     host: Optional[str] = None
     port: Optional[int] = None
     url: Optional[str] = None
+    docker_image: Optional[str] = None
+    docker_ports: Optional[List[str]] = None
+    docker_volumes: Optional[List[str]] = None
+    health_check_url: Optional[str] = None
+    health_check_timeout: int = 30
 
 class MCPManager:
     """Manages MCP server connections and tool discovery"""
@@ -42,6 +48,91 @@ class MCPManager:
         """Add an MCP server configuration"""
         self.servers[server.name] = server
         self.logger.info(f"Added MCP server: {server.name}")
+        
+    def add_docker_mcp_server(self, 
+                            name: str,
+                            docker_image: str,
+                            env_vars: Dict[str, str] = None,
+                            transport: str = "stdio",
+                            ports: List[str] = None,
+                            volumes: List[str] = None,
+                            health_check_url: str = None,
+                            health_check_timeout: int = 30,
+                            additional_args: List[str] = None):
+        """
+        Dynamically add any Docker MCP server with minimal configuration
+        
+        Args:
+            name: Unique name for the server
+            docker_image: Docker image name (e.g., "mcp/slack", "mcp/brave-search")
+            env_vars: Environment variables to pass to the container
+            transport: Transport type ("stdio", "http", "sse")
+            ports: Port mappings (e.g., ["8080:8080"])
+            volumes: Volume mappings (e.g., ["/host/path:/container/path"])
+            health_check_url: URL for health checks (for HTTP transport)
+            health_check_timeout: Timeout for health checks in seconds
+            additional_args: Additional Docker run arguments
+        """
+        if env_vars is None:
+            env_vars = {}
+        if additional_args is None:
+            additional_args = []
+            
+        # Build Docker arguments
+        docker_args = ["run"]
+        
+        # Add interactive flag for stdio transport
+        if transport == "stdio":
+            docker_args.extend(["-i", "--rm"])
+        else:
+            docker_args.extend(["-d", "--rm"])
+            
+        # Add environment variables
+        for key, value in env_vars.items():
+            docker_args.extend(["-e", key])
+            
+        # Add port mappings
+        if ports:
+            for port_mapping in ports:
+                docker_args.extend(["-p", port_mapping])
+                
+        # Add volume mappings
+        if volumes:
+            for volume_mapping in volumes:
+                docker_args.extend(["-v", volume_mapping])
+                
+        # Add the image name
+        docker_args.append(docker_image)
+        
+        # Add additional arguments after the image name
+        if additional_args:
+            docker_args.extend(additional_args)
+            
+        # Determine URL for HTTP transport
+        url = None
+        if transport == "http" and ports:
+            # Extract the host port from the first port mapping
+            host_port = ports[0].split(":")[0] if ":" in ports[0] else ports[0]
+            url = f"http://localhost:{host_port}"
+        elif health_check_url:
+            url = health_check_url
+            
+        server = MCPServer(
+            name=name,
+            command="docker",
+            args=docker_args,
+            env=env_vars,
+            transport=transport,
+            docker_image=docker_image,
+            docker_ports=ports,
+            docker_volumes=volumes,
+            health_check_url=health_check_url,
+            health_check_timeout=health_check_timeout,
+            url=url
+        )
+        
+        self.add_server(server)
+        self.logger.info(f"Added Docker MCP server: {name} using image {docker_image}")
         
     def add_slack_server(self, name: str = "slack", use_docker: bool = True):
         """Add Slack MCP server with Docker or NPX"""
@@ -556,3 +647,237 @@ class MCPManager:
         server_names = list(self.active_connections.keys())
         for server_name in server_names:
             await self.stop_server(server_name) 
+
+    def remove_server(self, server_name: str) -> bool:
+        """Remove an MCP server configuration"""
+        if server_name in self.servers:
+            del self.servers[server_name]
+            self.logger.info(f"Removed MCP server configuration: {server_name}")
+            return True
+        else:
+            self.logger.warning(f"Server {server_name} not found in configuration")
+            return False
+            
+    def get_server_config(self, server_name: str) -> Optional[MCPServer]:
+        """Get server configuration"""
+        return self.servers.get(server_name)
+        
+    def list_configured_servers(self) -> List[str]:
+        """List all configured server names"""
+        return list(self.servers.keys())
+        
+    def load_servers_from_config(self, config_file: str = "configs/mcp_servers.json") -> Dict[str, bool]:
+        """
+        Load server configurations from a JSON file
+        
+        Args:
+            config_file: Path to the JSON configuration file
+            
+        Returns:
+            Dict mapping server names to success status
+        """
+        results = {}
+        
+        try:
+            if not os.path.exists(config_file):
+                self.logger.warning(f"Configuration file {config_file} not found")
+                return results
+                
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+                
+            servers_config = config.get('servers', {})
+            
+            for server_name, server_config in servers_config.items():
+                try:
+                    # Substitute environment variables
+                    processed_config = self._substitute_env_vars(server_config)
+                    
+                    # Check if required environment variables are set
+                    env_vars = processed_config.get('env_vars', {})
+                    missing_vars = []
+                    
+                    for key, value in env_vars.items():
+                        if value.startswith('${') and value.endswith('}'):
+                            env_var_name = value[2:-1]  # Remove ${ and }
+                            if not os.getenv(env_var_name):
+                                missing_vars.append(env_var_name)
+                    
+                    if missing_vars:
+                        self.logger.warning(f"Skipping server '{server_name}' - missing environment variables: {missing_vars}")
+                        results[server_name] = False
+                        continue
+                    
+                    # Add the server using the dynamic method
+                    self.add_docker_mcp_server(
+                        name=server_name,
+                        docker_image=processed_config['docker_image'],
+                        env_vars=processed_config.get('env_vars', {}),
+                        transport=processed_config.get('transport', 'stdio'),
+                        ports=processed_config.get('ports'),
+                        volumes=processed_config.get('volumes'),
+                        health_check_url=processed_config.get('health_check_url'),
+                        health_check_timeout=processed_config.get('health_check_timeout', 30),
+                        additional_args=processed_config.get('additional_args')
+                    )
+                    
+                    results[server_name] = True
+                    self.logger.info(f"Loaded server configuration: {server_name}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to load server {server_name}: {e}")
+                    results[server_name] = False
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to load configuration file {config_file}: {e}")
+            
+        return results
+        
+    def _substitute_env_vars(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Substitute environment variables in configuration values
+        
+        Args:
+            config: Configuration dictionary
+            
+        Returns:
+            Configuration with environment variables substituted
+        """
+        processed_config = {}
+        
+        for key, value in config.items():
+            if isinstance(value, dict):
+                processed_config[key] = self._substitute_env_vars(value)
+            elif isinstance(value, list):
+                processed_config[key] = [
+                    self._substitute_env_vars(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            elif isinstance(value, str):
+                # Replace ${VAR_NAME} patterns with environment variable values
+                def substitute_var(match):
+                    var_name = match.group(1)
+                    # Try environment variable first
+                    env_value = os.getenv(var_name)
+                    if env_value:
+                        return env_value
+                    # Try shell variables for common ones
+                    if var_name == "PWD":
+                        return os.getcwd()
+                    # Return original if not found
+                    return match.group(0)
+                
+                processed_config[key] = re.sub(
+                    r'\$\{([^}]+)\}',
+                    substitute_var,
+                    value
+                )
+            else:
+                processed_config[key] = value
+                
+        return processed_config
+        
+    def save_servers_to_config(self, config_file: str = "configs/mcp_servers.json") -> bool:
+        """
+        Save current server configurations to a JSON file
+        
+        Args:
+            config_file: Path to the JSON configuration file
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            config = {
+                "servers": {},
+                "metadata": {
+                    "version": "1.0.0",
+                    "description": "Configuration for Docker MCP servers",
+                    "instructions": "Add or remove server configurations here. Environment variables with ${VAR_NAME} will be automatically replaced with values from .env file."
+                }
+            }
+            
+            for server_name, server in self.servers.items():
+                if hasattr(server, 'docker_image') and server.docker_image:
+                    # Convert MCPServer to config format
+                    server_config = {
+                        "docker_image": server.docker_image,
+                        "transport": server.transport,
+                        "env_vars": server.env,
+                        "description": f"MCP server: {server_name}"
+                    }
+                    
+                    if server.docker_ports:
+                        server_config["ports"] = server.docker_ports
+                    if server.docker_volumes:
+                        server_config["volumes"] = server.docker_volumes
+                    if server.health_check_url:
+                        server_config["health_check_url"] = server.health_check_url
+                    if server.health_check_timeout != 30:
+                        server_config["health_check_timeout"] = server.health_check_timeout
+                        
+                    config["servers"][server_name] = server_config
+                    
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+            
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+                
+            self.logger.info(f"Saved server configurations to {config_file}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save configuration file {config_file}: {e}")
+            return False
+            
+    def check_available_servers(self, config_file: str = "configs/mcp_servers.json") -> Dict[str, Dict[str, Any]]:
+        """
+        Check which servers are available based on environment variables
+        
+        Args:
+            config_file: Path to the JSON configuration file
+            
+        Returns:
+            Dict mapping server names to availability info
+        """
+        results = {}
+        
+        try:
+            if not os.path.exists(config_file):
+                self.logger.warning(f"Configuration file {config_file} not found")
+                return results
+                
+            with open(config_file, 'r') as f:
+                config = json.load(f)
+                
+            servers_config = config.get('servers', {})
+            
+            for server_name, server_config in servers_config.items():
+                env_vars = server_config.get('env_vars', {})
+                missing_vars = []
+                available_vars = []
+                
+                for key, value in env_vars.items():
+                    if value.startswith('${') and value.endswith('}'):
+                        env_var_name = value[2:-1]  # Remove ${ and }
+                        if os.getenv(env_var_name):
+                            available_vars.append(env_var_name)
+                        else:
+                            missing_vars.append(env_var_name)
+                    else:
+                        available_vars.append(key)
+                
+                results[server_name] = {
+                    "available": len(missing_vars) == 0,
+                    "missing_vars": missing_vars,
+                    "available_vars": available_vars,
+                    "description": server_config.get('description', ''),
+                    "transport": server_config.get('transport', 'stdio'),
+                    "docker_image": server_config.get('docker_image', '')
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Failed to check available servers: {e}")
+            
+        return results 

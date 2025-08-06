@@ -1,0 +1,76 @@
+{
+  "servers": {
+    "slack": {
+      "docker_image": "mcp/slack",
+      "transport": "stdio",
+      "env_vars": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "description": "Slack integration for sending messages and reading channels"
+    },
+    "brave-search": {
+      "docker_image": "mcp/brave-search",
+      "transport": "http",
+      "ports": ["8080:8080"],
+      "env_vars": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "health_check_url": "http://localhost:8080/",
+      "description": "Brave Search for web search capabilities"
+    },
+    "wolfram-alpha": {
+      "docker_image": "mcp/wolfram-alpha",
+      "transport": "stdio",
+      "env_vars": {
+        "WOLFRAM_API_KEY": "${WOLFRAM_API_KEY}"
+      },
+      "description": "Wolfram Alpha for computational knowledge and calculations"
+    },
+    "github": {
+      "docker_image": "mcp/github",
+      "transport": "stdio",
+      "env_vars": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub integration for repository management and code operations"
+    },
+    "postgres": {
+      "docker_image": "mcp/postgres",
+      "transport": "stdio",
+      "env_vars": {
+        "DATABASE_URL": "${POSTGRES_CONNECTION_STRING}"
+      },
+      "description": "PostgreSQL database operations"
+    },
+    "redis": {
+      "docker_image": "mcp/redis",
+      "transport": "stdio",
+      "env_vars": {
+        "REDIS_URL": "${REDIS_URL}"
+      },
+      "description": "Redis cache and database operations"
+    },
+    "openweather": {
+      "docker_image": "mcp/openweather",
+      "transport": "stdio",
+      "env_vars": {
+        "OPENWEATHER_API_KEY": "${OPENWEATHER_API_KEY}"
+      },
+      "description": "OpenWeather API for weather information"
+    },
+    "news": {
+      "docker_image": "mcp/news",
+      "transport": "stdio",
+      "env_vars": {
+        "NEWS_API_KEY": "${NEWS_API_KEY}"
+      },
+      "description": "News API for current events and articles"
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Configuration for Docker MCP servers",
+    "instructions": "Add or remove server configurations here. Environment variables with ${VAR_NAME} will be automatically replaced with values from .env file. Servers with missing environment variables will be skipped."
+  }
+} 

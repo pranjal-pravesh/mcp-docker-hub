@@ -75,6 +75,76 @@ make dev
 python scripts/run_hub.py --dev --add-all-servers
 ```
 
+### Dynamic Docker MCP Server Management
+
+The MCP Hub now supports effortless addition and removal of any Docker MCP server with minimal configuration changes:
+
+#### Quick Setup (Recommended)
+```bash
+# Interactive environment setup
+python scripts/setup_env.py
+
+# Check which servers are available
+python scripts/check_servers.py
+
+# Start hub with available servers
+python -m mcp_hub.mcp_hub_server --load-config
+```
+
+#### Using the CLI Tool
+```bash
+# Add a new server
+python scripts/manage_mcp_servers.py add my-slack mcp/slack --env-vars SLACK_BOT_TOKEN SLACK_TEAM_ID
+
+# Add a server with HTTP transport
+python scripts/manage_mcp_servers.py add brave mcp/brave-search --transport http --ports 8080:8080
+
+# List all servers
+python scripts/manage_mcp_servers.py list
+
+# Remove a server
+python scripts/manage_mcp_servers.py remove my-slack
+```
+
+#### Using JSON Configuration
+Edit `configs/mcp_servers.json` to add or remove servers:
+```json
+{
+  "servers": {
+    "my-custom-server": {
+      "docker_image": "mcp/my-custom-server",
+      "transport": "stdio",
+      "env_vars": {"API_KEY": "${MY_API_KEY}"},
+      "description": "My custom MCP server"
+    }
+  }
+}
+```
+
+#### Using the REST API
+```bash
+# Check server availability
+curl "http://localhost:8000/servers/check-availability"
+
+# Add a server via API
+curl -X POST "http://localhost:8000/servers/add-docker" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-server", "docker_image": "mcp/slack", "env_vars": {"SLACK_BOT_TOKEN": "xoxb-..."}}'
+
+# Load configuration from file
+curl -X POST "http://localhost:8000/servers/load-config"
+```
+
+#### Start Hub with Configuration
+```bash
+# Load all servers from config file on startup
+python -m mcp_hub.mcp_hub_server --load-config
+```
+
+**Note**: Servers with missing environment variables will be automatically skipped, so you can configure only the servers you need.
+
+For detailed documentation, see [Dynamic MCP Server Management](docs/DYNAMIC_MCP_SERVERS.md).
+
 ### Docker Deployment
 
 ```bash

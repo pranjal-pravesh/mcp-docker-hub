@@ -1,0 +1,87 @@
+<frozen runpy>:128: RuntimeWarning: 'mcp_hub.mcp_hub_server' found in sys.modules after import of package 'mcp_hub', but prior to execution of 'mcp_hub.mcp_hub_server'; this may result in unpredictable behaviour
+INFO:__main__:Loading servers from configuration file: configs/mcp_servers.json
+INFO:mcp_hub.mcp_manager:Added MCP server: slack
+INFO:mcp_hub.mcp_manager:Added Docker MCP server: slack using image mcp/slack
+INFO:mcp_hub.mcp_manager:Loaded server configuration: slack
+INFO:mcp_hub.mcp_manager:Added MCP server: brave-search
+INFO:mcp_hub.mcp_manager:Added Docker MCP server: brave-search using image mcp/brave-search
+INFO:mcp_hub.mcp_manager:Loaded server configuration: brave-search
+INFO:mcp_hub.mcp_manager:Added MCP server: wolfram-alpha
+INFO:mcp_hub.mcp_manager:Added Docker MCP server: wolfram-alpha using image mcp/wolfram-alpha
+INFO:mcp_hub.mcp_manager:Loaded server configuration: wolfram-alpha
+WARNING:mcp_hub.mcp_manager:Skipping server 'github' - missing environment variables: ['GITHUB_TOKEN']
+INFO:mcp_hub.mcp_manager:Added MCP server: file-system
+INFO:mcp_hub.mcp_manager:Added Docker MCP server: file-system using image mcp/filesystem
+INFO:mcp_hub.mcp_manager:Loaded server configuration: file-system
+WARNING:mcp_hub.mcp_manager:Skipping server 'postgres' - missing environment variables: ['POSTGRES_CONNECTION_STRING']
+WARNING:mcp_hub.mcp_manager:Skipping server 'redis' - missing environment variables: ['REDIS_URL']
+INFO:mcp_hub.mcp_manager:Added MCP server: openweather
+INFO:mcp_hub.mcp_manager:Added Docker MCP server: openweather using image mcp/openweather
+INFO:mcp_hub.mcp_manager:Loaded server configuration: openweather
+WARNING:mcp_hub.mcp_manager:Skipping server 'news' - missing environment variables: ['NEWS_API_KEY']
+INFO:mcp_hub.mcp_manager:Added MCP server: calendar
+INFO:mcp_hub.mcp_manager:Added Docker MCP server: calendar using image mcp/calendar
+INFO:mcp_hub.mcp_manager:Loaded server configuration: calendar
+INFO:__main__:Loaded 6/10 servers from configuration
+INFO:__main__:Starting all loaded servers...
+INFO:mcp_hub.mcp_manager:Starting server: slack
+INFO:mcp_hub.mcp_manager:Discovered 8 tools for slack
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_list_channels
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_post_message
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_reply_to_thread
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_add_reaction
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_get_channel_history
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_get_thread_replies
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_get_users
+INFO:mcp_hub.tool_adapter:Registered stdio tool: slack_get_user_profile
+INFO:mcp_hub.mcp_manager:  - slack_list_channels: List public or pre-defined channels in the workspace with pagination
+INFO:mcp_hub.mcp_manager:  - slack_post_message: Post a new message to a Slack channel
+INFO:mcp_hub.mcp_manager:  - slack_reply_to_thread: Reply to a specific message thread in Slack
+INFO:mcp_hub.mcp_manager:  - slack_add_reaction: Add a reaction emoji to a message
+INFO:mcp_hub.mcp_manager:  - slack_get_channel_history: Get recent messages from a channel
+INFO:mcp_hub.mcp_manager:  - slack_get_thread_replies: Get all replies in a message thread
+INFO:mcp_hub.mcp_manager:  - slack_get_users: Get a list of all users in the workspace with their basic profile information
+INFO:mcp_hub.mcp_manager:  - slack_get_user_profile: Get detailed profile information for a specific user
+INFO:mcp_hub.mcp_manager:Started MCP server: slack
+INFO:mcp_hub.mcp_manager:Starting server: brave-search
+INFO:httpx:HTTP Request: GET http://localhost:8080/ "HTTP/1.1 404 Not Found"
+INFO:mcp_hub.mcp_manager:HTTP server brave-search is ready
+INFO:httpx:HTTP Request: GET http://localhost:8080/mcp "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://localhost:8080/mcp "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://localhost:8080/mcp "HTTP/1.1 200 OK"
+INFO:mcp_hub.tool_adapter:Registered SSE tool: brave_web_search
+INFO:mcp_hub.tool_adapter:Registered SSE tool: brave_local_search
+INFO:mcp_hub.tool_adapter:Registered SSE tool: brave_video_search
+INFO:mcp_hub.tool_adapter:Registered SSE tool: brave_image_search
+INFO:mcp_hub.tool_adapter:Registered SSE tool: brave_news_search
+INFO:mcp_hub.tool_adapter:Registered SSE tool: brave_summarizer
+INFO:mcp_hub.mcp_manager:Discovered 6 tools from HTTP server brave-search
+INFO:mcp_hub.mcp_manager:Starting server: wolfram-alpha
+INFO:mcp_hub.mcp_manager:Discovered 1 tools for wolfram-alpha
+INFO:mcp_hub.tool_adapter:Registered stdio tool: query-wolfram-alpha
+INFO:mcp_hub.mcp_manager:  - query-wolfram-alpha: Use Wolfram Alpha to answer a question. This tool should be used when you need complex math or symbolic intelligence.
+INFO:mcp_hub.mcp_manager:Started MCP server: wolfram-alpha
+INFO:mcp_hub.mcp_manager:Starting server: file-system
+ERROR:mcp_hub.mcp_manager:Process failed to start: docker: invalid reference format
+
+Run 'docker run --help' for more information
+
+INFO:mcp_hub.mcp_manager:Starting server: openweather
+INFO:mcp_hub.mcp_manager:Discovered 1 tools for openweather
+INFO:mcp_hub.tool_adapter:Registered stdio tool: weather
+INFO:mcp_hub.mcp_manager:  - weather: Get current and forecast weather information for a specific City
+INFO:mcp_hub.mcp_manager:Started MCP server: openweather
+INFO:mcp_hub.mcp_manager:Starting server: calendar
+ERROR:mcp_hub.mcp_manager:No response received
+INFO:mcp_hub.mcp_manager:Started MCP server: calendar
+INFO:__main__:Started 5/6 servers
+INFO:__main__:Starting MCP Hub Server on 0.0.0.0:8000
+INFO:__main__:API documentation available at http://localhost:8000/docs
+INFO:     Started server process [86063]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86063]
