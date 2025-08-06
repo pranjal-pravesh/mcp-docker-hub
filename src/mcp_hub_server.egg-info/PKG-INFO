@@ -1,3 +1,37 @@
+Metadata-Version: 2.4
+Name: mcp-hub-server
+Version: 1.0.0
+Summary: A centralized hub server that provides a unified HTTP API for all MCP tools
+Home-page: https://github.com/yourusername/mcp-hub
+Author: MCP Hub Team
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi==0.104.1
+Requires-Dist: uvicorn[standard]==0.24.0
+Requires-Dist: pydantic==2.5.0
+Requires-Dist: python-dotenv==1.0.0
+Requires-Dist: httpx==0.25.2
+Requires-Dist: rich==13.7.0
+Requires-Dist: aiohttp==3.9.1
+Requires-Dist: pytest==7.4.3
+Requires-Dist: pytest-asyncio==0.21.1
+Requires-Dist: gunicorn==21.2.0
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 # MCP Hub Server
 
 A centralized hub server that provides a unified HTTP API for all MCP (Model Context Protocol) tools. This allows external clients to discover and call tools from multiple MCP servers through a single interface.

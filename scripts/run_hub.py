@@ -8,10 +8,10 @@ import argparse
 import sys
 import os
 
-# Add the current directory to the Python path
-sys.path.insert(0, os.path.dirname(__file__))
+# Add the src directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from mcp_hub_server import MCPHubServer
+from mcp_hub import MCPHubServer
 
 async def main():
     parser = argparse.ArgumentParser(

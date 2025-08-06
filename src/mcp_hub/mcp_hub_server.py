@@ -14,8 +14,8 @@ import uvicorn
 from datetime import datetime
 import time
 
-from mcp_manager import MCPManager
-from tool_adapter import ToolHub
+from .mcp_manager import MCPManager
+from .tool_adapter import ToolHub
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

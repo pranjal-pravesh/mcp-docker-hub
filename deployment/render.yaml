@@ -2,8 +2,8 @@ services:
   - type: web
     name: mcp-hub-server
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run_hub.py --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt && pip install -e .
+    startCommand: python scripts/run_hub.py --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0

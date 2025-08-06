@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Example MCP Hub Client
-Demonstrates how to use the MCP Hub Server API from a client application.
+MCP Hub Client - Example client for interacting with MCP Hub Server
 """
 import asyncio
 import aiohttp
@@ -9,8 +8,8 @@ import json
 import sys
 import os
 
-# Add the mcps directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Add the src directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 class MCPHubClient:
     """Client for interacting with the MCP Hub Server"""

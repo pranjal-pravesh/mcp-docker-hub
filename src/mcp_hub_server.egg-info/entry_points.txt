@@ -1,0 +1,2 @@
+[console_scripts]
+mcp-hub = scripts.run_hub:main

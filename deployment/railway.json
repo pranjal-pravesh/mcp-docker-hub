@@ -5,7 +5,7 @@
     "dockerfilePath": "deployment/Dockerfile"
   },
   "deploy": {
-    "startCommand": "python run_hub.py --host 0.0.0.0 --port $PORT",
+    "startCommand": "python scripts/run_hub.py --host 0.0.0.0 --port $PORT",
     "healthcheckPath": "/",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",

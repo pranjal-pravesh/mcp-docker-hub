@@ -13,9 +13,9 @@ install: ## Install Python dependencies
 
 setup: ## Initial setup (install dependencies and create .env)
 	@if [ -d "venv" ]; then \
-		source venv/bin/activate && pip install -r requirements.txt; \
+		source venv/bin/activate && pip install -r requirements.txt && pip install -e .; \
 	else \
-		pip install -r requirements.txt; \
+		pip install -r requirements.txt && pip install -e .; \
 	fi
 	@if [ ! -f .env ]; then \
 		cp env.example .env; \
@@ -26,23 +26,23 @@ setup: ## Initial setup (install dependencies and create .env)
 
 dev: ## Start development server
 	@if [ -d "venv" ]; then \
-		source venv/bin/activate && python run_hub.py --dev --add-all-servers; \
+		source venv/bin/activate && python scripts/run_hub.py --dev --add-all-servers; \
 	else \
-		python run_hub.py --dev --add-all-servers; \
+		python scripts/run_hub.py --dev --add-all-servers; \
 	fi
 
 test: ## Run tests
 	@if [ -d "venv" ]; then \
-		source venv/bin/activate && python -m pytest examples/test_mcp_hub.py --offline; \
+		source venv/bin/activate && python -m pytest tests/ --offline; \
 	else \
-		python -m pytest examples/test_mcp_hub.py --offline; \
+		python -m pytest tests/ --offline; \
 	fi
 
 test-online: ## Run online tests (requires running server)
 	@if [ -d "venv" ]; then \
-		source venv/bin/activate && python -m pytest examples/test_mcp_hub.py; \
+		source venv/bin/activate && python -m pytest tests/; \
 	else \
-		python -m pytest examples/test_mcp_hub.py; \
+		python -m pytest tests/; \
 	fi
 
 clean: ## Clean up Python cache files

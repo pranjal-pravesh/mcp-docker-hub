@@ -11,7 +11,7 @@ import httpx
 from dataclasses import dataclass
 import os
 from dotenv import load_dotenv
-from tool_adapter import ToolHub, ProtocolType
+from .tool_adapter import ToolHub, ProtocolType
 
 # Load environment variables
 load_dotenv()

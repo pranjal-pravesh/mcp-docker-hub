@@ -32,4 +32,4 @@ fi
 
 # Start the server
 echo "🎯 Starting server with all available MCP servers..."
-python run_hub.py --add-all-servers "$@" 
+python scripts/run_hub.py --add-all-servers "$@" 

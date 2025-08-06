@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI tool for managing and testing MCP servers
+MCP CLI - Interactive command-line interface for MCP Hub Server
 """
 import asyncio
 import argparse
@@ -12,7 +12,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.prompt import Prompt
 
-from mcp_manager import MCPManager, MCPServer
+from .mcp_manager import MCPManager, MCPServer
 
 class MCPCLIInterface:
     """Command-line interface for MCP server management"""

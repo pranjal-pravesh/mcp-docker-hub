@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test script for the MCP Hub Server
+Test suite for MCP Hub Server
 """
 import asyncio
 import aiohttp
@@ -8,8 +8,17 @@ import json
 import sys
 import os
 
-# Add the mcps directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Add the src directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+try:
+    from mcp_hub import MCPHubServer
+    from mcp_hub.mcp_manager import MCPManager
+    from mcp_hub.tool_adapter import ToolHub
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    print("Make sure you're running from the project root directory")
+    sys.exit(1)
 
 async def test_hub_server():
     """Test the MCP Hub Server functionality"""
@@ -133,8 +142,6 @@ async def test_hub_server_offline():
     print("🧪 Testing MCP Hub Server (offline mode)...")
     
     try:
-        from mcp_hub_server import MCPHubServer
-        
         # Create hub server instance
         hub = MCPHubServer(host="127.0.0.1", port=8000)
         

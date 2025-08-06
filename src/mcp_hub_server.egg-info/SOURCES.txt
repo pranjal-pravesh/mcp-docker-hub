@@ -1,0 +1,15 @@
+README.md
+setup.py
+src/mcp_hub/__init__.py
+src/mcp_hub/mcp_cli.py
+src/mcp_hub/mcp_hub_server.py
+src/mcp_hub/mcp_manager.py
+src/mcp_hub/tool_adapter.py
+src/mcp_hub_server.egg-info/PKG-INFO
+src/mcp_hub_server.egg-info/SOURCES.txt
+src/mcp_hub_server.egg-info/dependency_links.txt
+src/mcp_hub_server.egg-info/entry_points.txt
+src/mcp_hub_server.egg-info/not-zip-safe
+src/mcp_hub_server.egg-info/requires.txt
+src/mcp_hub_server.egg-info/top_level.txt
+tests/test_mcp_hub.py
