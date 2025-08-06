@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mcp-hub-server
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_hub.py --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_TEAM_ID
+        sync: false
+      - key: SLACK_CHANNEL_IDS
+        sync: false
+      - key: BRAVE_API_KEY
+        sync: false
+      - key: WOLFRAM_APP_ID
+        sync: false 
