@@ -27,10 +27,12 @@ RUN pip install -e .
 RUN mkdir -p logs
 
 # Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser
 
-# Add appuser to docker group
-RUN usermod -aG docker appuser
+# Add appuser to docker group and set proper permissions
+RUN usermod -aG docker appuser && \
+    chown -R appuser:appuser /app && \
+    chmod 666 /var/run/docker.sock || true
 
 # Switch to appuser
 USER appuser

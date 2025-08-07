@@ -1,301 +1,504 @@
-# Dynamic Docker MCP Server Management
+# Dynamic MCP Server Management Guide
 
-This document explains how to effortlessly add and remove any Docker MCP server with minimal configuration changes.
+This guide explains how to dynamically add and remove Docker MCP servers to your MCP Hub with minimal configuration changes.
 
-## Overview
+## 🎯 Overview
 
-The MCP Hub now supports dynamic management of Docker MCP servers through:
-- **JSON Configuration Files**: Easy server configuration management
-- **REST API Endpoints**: Programmatic server management
-- **CLI Tool**: Command-line server management
-- **Environment Variable Substitution**: Automatic configuration from `.env` files
+The MCP Hub supports effortless addition and removal of any Docker MCP server through three methods:
+- **REST API** - Programmatic server management
+- **CLI Tool** - Command-line interface
+- **JSON Configuration** - File-based configuration
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Using the CLI Tool (Recommended)
+### 1. Check Available Servers
 
-The easiest way to manage Docker MCP servers is using the CLI tool:
+```bash
+# Check which servers are available with your current environment variables
+python scripts/check_servers.py
+```
+
+### 2. Start Hub with Available Servers
+
+```bash
+# Start the hub and automatically load available servers
+python -m mcp_hub.mcp_hub_server --load-config
+```
+
+### 3. Access the API
+
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/
+- **Server Status**: http://localhost:8000/servers
+
+## 🔧 CLI Management
+
+### Installation
+
+The CLI tool is included in the project. No additional installation needed.
+
+### Basic Commands
 
 ```bash
 # Add a new server
-python scripts/manage_mcp_servers.py add my-slack mcp/slack --env-vars SLACK_BOT_TOKEN SLACK_TEAM_ID
+python scripts/manage_mcp_servers.py add \
+  --name my-slack \
+  --docker-image mcp/slack \
+  --env-vars SLACK_BOT_TOKEN SLACK_TEAM_ID
 
-# Add a server with HTTP transport
-python scripts/manage_mcp_servers.py add brave mcp/brave-search --transport http --ports 8080:8080 --health-check-url http://localhost:8080/
+# Add server with HTTP transport
+python scripts/manage_mcp_servers.py add \
+  --name brave \
+  --docker-image mcp/brave-search \
+  --transport http \
+  --ports 8080:8080
 
 # List all servers
 python scripts/manage_mcp_servers.py list
 
-# Remove a server
-python scripts/manage_mcp_servers.py remove my-slack
-
 # Show server details
-python scripts/manage_mcp_servers.py show my-slack
+python scripts/manage_mcp_servers.py show --name my-slack
+
+# Remove a server
+python scripts/manage_mcp_servers.py remove --name my-slack
 ```
 
-### 2. Using JSON Configuration
-
-Edit `configs/mcp_servers.json` to add or remove servers:
-
-```json
-{
-  "servers": {
-    "my-custom-server": {
-      "docker_image": "mcp/my-custom-server",
-      "transport": "stdio",
-      "env_vars": {
-        "API_KEY": "${MY_API_KEY}",
-        "CUSTOM_SETTING": "value"
-      },
-      "description": "My custom MCP server"
-    }
-  }
-}
-```
-
-### 3. Using the REST API
+### Advanced CLI Options
 
 ```bash
-# Add a server via API
+# Add server with custom configuration
+python scripts/manage_mcp_servers.py add \
+  --name custom-server \
+  --docker-image mcp/custom-server \
+  --transport stdio \
+  --env-vars API_KEY SECRET_KEY \
+  --ports 9000:9000 \
+  --volumes /host/path:/container/path \
+  --health-check-url http://localhost:9000/health \
+  --health-check-timeout 60
+
+# Add server with additional arguments
+python scripts/manage_mcp_servers.py add \
+  --name file-system \
+  --docker-image mcp/filesystem \
+  --transport stdio \
+  --additional-args /workspace
+```
+
+## 🌐 REST API Management
+
+### Server Operations
+
+```bash
+# Check server availability
+curl "http://localhost:8000/servers/check-availability"
+
+# Add a new server
 curl -X POST "http://localhost:8000/servers/add-docker" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-server",
     "docker_image": "mcp/slack",
     "transport": "stdio",
-    "env_vars": {"SLACK_BOT_TOKEN": "xoxb-..."}
+    "env_vars": {
+      "SLACK_BOT_TOKEN": "xoxb-your-token",
+      "SLACK_TEAM_ID": "your-team-id"
+    }
   }'
+
+# List configured servers
+curl "http://localhost:8000/servers/configured"
+
+# Get server configuration
+curl "http://localhost:8000/servers/config/my-server"
+
+# Remove a server
+curl -X DELETE "http://localhost:8000/servers/my-server"
 
 # Load configuration from file
 curl -X POST "http://localhost:8000/servers/load-config"
 
-# Remove a server
-curl -X DELETE "http://localhost:8000/servers/my-server"
+# Save current configuration
+curl -X POST "http://localhost:8000/servers/save-config"
 ```
-
-## Configuration Options
-
-### Server Configuration Fields
-
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `docker_image` | string | Docker image name | `"mcp/slack"` |
-| `transport` | string | Transport type | `"stdio"`, `"http"`, `"sse"` |
-| `env_vars` | object | Environment variables | `{"API_KEY": "${API_KEY}"}` |
-| `ports` | array | Port mappings | `["8080:8080"]` |
-| `volumes` | array | Volume mappings | `["/host:/container"]` |
-| `health_check_url` | string | Health check URL | `"http://localhost:8080/"` |
-| `health_check_timeout` | integer | Health check timeout | `30` |
-| `description` | string | Server description | `"Slack integration"` |
-
-### Transport Types
-
-#### stdio (Default)
-- Uses standard input/output for communication
-- Best for most MCP servers
-- No port configuration needed
-
-```json
-{
-  "docker_image": "mcp/slack",
-  "transport": "stdio",
-  "env_vars": {"SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"}
-}
-```
-
-#### http
-- Uses HTTP for communication
-- Requires port mapping and health check URL
-- Good for servers that expose HTTP endpoints
-
-```json
-{
-  "docker_image": "mcp/brave-search",
-  "transport": "http",
-  "ports": ["8080:8080"],
-  "health_check_url": "http://localhost:8080/",
-  "env_vars": {"BRAVE_API_KEY": "${BRAVE_API_KEY}"}
-}
-```
-
-#### sse
-- Uses Server-Sent Events for communication
-- Requires port mapping
-- Less common, used by specific servers
-
-## Environment Variable Substitution
-
-The system automatically substitutes environment variables in configuration:
-
-```json
-{
-  "env_vars": {
-    "API_KEY": "${MY_API_KEY}",
-    "DATABASE_URL": "${POSTGRES_CONNECTION_STRING}",
-    "CUSTOM_VALUE": "static_value"
-  }
-}
-```
-
-Variables with `${VAR_NAME}` syntax are replaced with values from your `.env` file.
-
-## Starting the Hub with Configuration
-
-### Load Configuration on Startup
-
-```bash
-# Start hub and load all servers from config
-python -m mcp_hub.mcp_hub_server --load-config
-
-# Use custom config file
-python -m mcp_hub.mcp_hub_server --load-config --config-file my_config.json
-```
-
-### Legacy Mode
-
-```bash
-# Start with legacy hardcoded servers
-python -m mcp_hub.mcp_hub_server --add-all-servers
-```
-
-## API Endpoints
-
-### Server Management
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/servers/add-docker` | Add a new Docker MCP server |
-| `DELETE` | `/servers/{name}` | Remove a server |
-| `GET` | `/servers/configured` | List configured servers |
-| `GET` | `/servers/config/{name}` | Get server configuration |
-| `POST` | `/servers/load-config` | Load from config file |
-| `POST` | `/servers/save-config` | Save to config file |
 
 ### Server Control
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/servers/{name}/start` | Start a server |
-| `POST` | `/servers/{name}/stop` | Stop a server |
-| `POST` | `/servers/start-all` | Start all servers |
-| `POST` | `/servers/stop-all` | Stop all servers |
-
-## Examples
-
-### Adding Common MCP Servers
-
-#### Slack Integration
 ```bash
-python scripts/manage_mcp_servers.py add slack mcp/slack \
-  --env-vars SLACK_BOT_TOKEN SLACK_TEAM_ID SLACK_CHANNEL_IDS \
-  --description "Slack integration for messaging"
+# Start all servers
+curl -X POST "http://localhost:8000/servers/start-all"
+
+# Stop all servers
+curl -X POST "http://localhost:8000/servers/stop-all"
+
+# Start specific server
+curl -X POST "http://localhost:8000/servers/my-server/start"
+
+# Stop specific server
+curl -X POST "http://localhost:8000/servers/my-server/stop"
 ```
 
-#### GitHub Integration
-```bash
-python scripts/manage_mcp_servers.py add github mcp/github \
-  --env-vars GITHUB_TOKEN \
-  --description "GitHub repository management"
-```
+## 📄 JSON Configuration
 
-#### File System Operations
-```bash
-python scripts/manage_mcp_servers.py add filesystem mcp/file-system \
-  --volumes "${PWD}:/workspace" \
-  --description "File system operations"
-```
+### Configuration File Structure
 
-#### Database Operations
-```bash
-python scripts/manage_mcp_servers.py add postgres mcp/postgres \
-  --env-vars POSTGRES_CONNECTION_STRING \
-  --description "PostgreSQL database operations"
-```
+Edit `configs/mcp_servers.json` to define your servers:
 
-### Advanced Configuration
-
-#### Custom Docker Arguments
 ```json
 {
-  "servers": {
-    "custom-server": {
-      "docker_image": "my-custom-mcp:latest",
-      "transport": "stdio",
-      "env_vars": {"CUSTOM_VAR": "value"},
-      "additional_args": ["--network", "host", "--privileged"]
+  "slack": {
+    "docker_image": "mcp/slack",
+    "transport": "stdio",
+    "env_vars": {
+      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+      "SLACK_TEAM_ID": "${SLACK_TEAM_ID}",
+      "SLACK_CHANNEL_IDS": "${SLACK_CHANNEL_IDS}"
+    },
+    "description": "Slack integration for messaging and notifications"
+  },
+  "brave-search": {
+    "docker_image": "mcp/brave-search",
+    "transport": "http",
+    "env_vars": {
+      "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+    },
+    "docker_ports": ["8080:8080"],
+    "health_check_url": "http://localhost:8080/health",
+    "health_check_timeout": 30,
+    "description": "Brave Search for web queries"
+  },
+  "wolfram-alpha": {
+    "docker_image": "mcp/wolfram-alpha",
+    "transport": "stdio",
+    "env_vars": {
+      "WOLFRAM_API_KEY": "${WOLFRAM_API_KEY}"
+    },
+    "description": "Wolfram Alpha for computational knowledge"
+  },
+  "openweather": {
+    "docker_image": "mcp/openweather",
+    "transport": "stdio",
+    "env_vars": {
+      "OPENWEATHER_API_KEY": "${OPENWEATHER_API_KEY}"
+    },
+    "description": "OpenWeather for weather information"
+  }
+}
+```
+
+### Environment Variable Substitution
+
+The configuration supports environment variable substitution:
+
+```json
+{
+  "my-server": {
+    "docker_image": "mcp/my-server",
+    "env_vars": {
+      "API_KEY": "${MY_API_KEY}",
+      "SECRET": "${MY_SECRET}",
+      "WORKSPACE": "${PWD}"
     }
   }
 }
 ```
 
-#### Multiple Port Mappings
+**Supported substitutions:**
+- `${VARIABLE_NAME}` - Environment variables
+- `${PWD}` - Current working directory
+- `${HOME}` - User home directory
+
+### Loading Configuration
+
+```bash
+# Load configuration on startup
+python -m mcp_hub.mcp_hub_server --load-config
+
+# Load configuration via API
+curl -X POST "http://localhost:8000/servers/load-config"
+
+# Load specific configuration file
+curl -X POST "http://localhost:8000/servers/load-config?config_file=configs/custom_servers.json"
+```
+
+## 🔧 Configuration Options
+
+### Transport Types
+
+| Transport | Description | Use Case |
+|-----------|-------------|----------|
+| `stdio` | Standard input/output | Most MCP servers |
+| `http` | HTTP/HTTPS | Web-based servers |
+| `sse` | Server-Sent Events | Real-time servers |
+
+### Docker Configuration
+
 ```json
 {
-  "servers": {
-    "multi-port-server": {
-      "docker_image": "mcp/multi-port",
-      "transport": "http",
-      "ports": ["8080:8080", "8081:8081"],
-      "health_check_url": "http://localhost:8080/health"
-    }
+  "server-name": {
+    "docker_image": "mcp/server-image",
+    "transport": "stdio",
+    "env_vars": {
+      "API_KEY": "your-key"
+    },
+    "docker_ports": ["8080:8080", "9000:9000"],
+    "docker_volumes": ["/host/path:/container/path"],
+    "additional_args": ["arg1", "arg2"],
+    "health_check_url": "http://localhost:8080/health",
+    "health_check_timeout": 30
   }
 }
 ```
 
-## Troubleshooting
+### Health Check Configuration
+
+```json
+{
+  "server-name": {
+    "docker_image": "mcp/server-image",
+    "health_check_url": "http://localhost:8080/health",
+    "health_check_timeout": 60,
+    "health_check_interval": 30
+  }
+}
+```
+
+## 🛠️ Server Management Workflow
+
+### 1. Add New Server
+
+```bash
+# Step 1: Add server configuration
+python scripts/manage_mcp_servers.py add \
+  --name new-server \
+  --docker-image mcp/new-server \
+  --transport stdio \
+  --env-vars API_KEY
+
+# Step 2: Start the server
+curl -X POST "http://localhost:8000/servers/new-server/start"
+
+# Step 3: Verify server is running
+curl "http://localhost:8000/servers"
+```
+
+### 2. Update Server Configuration
+
+```bash
+# Step 1: Remove old configuration
+python scripts/manage_mcp_servers.py remove --name old-server
+
+# Step 2: Add new configuration
+python scripts/manage_mcp_servers.py add \
+  --name new-server \
+  --docker-image mcp/updated-server \
+  --transport http \
+  --ports 8080:8080
+
+# Step 3: Start updated server
+curl -X POST "http://localhost:8000/servers/new-server/start"
+```
+
+### 3. Remove Server
+
+```bash
+# Step 1: Stop the server
+curl -X POST "http://localhost:8000/servers/server-name/stop"
+
+# Step 2: Remove configuration
+python scripts/manage_mcp_servers.py remove --name server-name
+
+# Step 3: Verify removal
+curl "http://localhost:8000/servers/configured"
+```
+
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Server won't start**
-   - Check environment variables are set in `.env`
-   - Verify Docker image exists: `docker pull mcp/slack`
-   - Check logs: `docker logs <container_name>`
+1. **Server Not Starting**
+   ```bash
+   # Check Docker logs
+   docker logs <container-name>
+   
+   # Check MCP Hub logs
+   sudo journalctl -u mcp-hub.service -f
+   
+   # Test server manually
+   docker run --rm mcp/server-image
+   ```
 
-2. **Configuration not loading**
-   - Ensure JSON syntax is valid
-   - Check file permissions
-   - Verify environment variable names match `.env` file
+2. **Environment Variables Not Loading**
+   ```bash
+   # Check .env file
+   cat .env
+   
+   # Test environment loading
+   python scripts/check_servers.py
+   
+   # Check environment in container
+   docker exec <container-name> env
+   ```
 
-3. **Port conflicts**
-   - Use different host ports: `"8081:8080"`
-   - Check if ports are already in use: `netstat -tulpn | grep 8080`
+3. **Tools Not Discovered**
+   ```bash
+   # Check server status
+   curl "http://localhost:8000/servers"
+   
+   # Check tools
+   curl "http://localhost:8000/tools"
+   
+   # Restart server
+   curl -X POST "http://localhost:8000/servers/server-name/stop"
+   curl -X POST "http://localhost:8000/servers/server-name/start"
+   ```
 
-### Debug Mode
+4. **Permission Issues**
+   ```bash
+   # Check Docker permissions
+   docker run hello-world
+   
+   # Add user to docker group
+   sudo usermod -aG docker $USER
+   newgrp docker
+   ```
 
-Enable debug logging to see detailed information:
+### Debug Commands
 
 ```bash
-export LOG_LEVEL=DEBUG
-python -m mcp_hub.mcp_hub_server --load-config
+# Check all running containers
+docker ps
+
+# Check all containers (including stopped)
+docker ps -a
+
+# Check container logs
+docker logs <container-name>
+
+# Check container environment
+docker exec <container-name> env
+
+# Check container processes
+docker exec <container-name> ps aux
+
+# Test server connectivity
+curl http://localhost:8080/health
 ```
 
-## Best Practices
+## 📊 Monitoring and Health Checks
 
-1. **Use descriptive names** for servers
-2. **Group related servers** in separate config files
-3. **Use environment variables** for sensitive data
-4. **Test configurations** before production deployment
-5. **Keep configurations** in version control
-6. **Document custom servers** with descriptions
+### Health Check Endpoints
 
-## Migration from Legacy System
+```bash
+# Overall hub health
+curl "http://localhost:8000/"
 
-If you're using the old hardcoded server methods:
+# Server status
+curl "http://localhost:8000/servers"
 
-1. **Export current configuration**:
-   ```bash
-   curl -X POST "http://localhost:8000/servers/save-config"
-   ```
+# Tool availability
+curl "http://localhost:8000/tools"
 
-2. **Update your startup script**:
-   ```bash
-   # Old way
-   python -m mcp_hub.mcp_hub_server --add-all-servers
-   
-   # New way
-   python -m mcp_hub.mcp_hub_server --load-config
-   ```
+# Server availability check
+curl "http://localhost:8000/servers/check-availability"
+```
 
-3. **Remove hardcoded server calls** from your code
+### Log Monitoring
 
-The new system is backward compatible, so you can migrate gradually. 
+```bash
+# MCP Hub logs
+sudo journalctl -u mcp-hub.service -f
+
+# Docker container logs
+docker logs -f <container-name>
+
+# Combined logs
+docker-compose logs -f
+```
+
+## 🔒 Security Considerations
+
+### Environment Variables
+
+- Store sensitive data in `.env` files
+- Never commit `.env` files to version control
+- Use different keys for different environments
+- Rotate API keys regularly
+
+### Docker Security
+
+- Use specific image tags (not `latest`)
+- Run containers as non-root users
+- Limit container capabilities
+- Use read-only filesystems where possible
+
+### Network Security
+
+- Use internal networks for inter-container communication
+- Expose only necessary ports
+- Use HTTPS for external communication
+- Implement rate limiting
+
+## 📚 Examples
+
+### Complete Server Configuration
+
+```json
+{
+  "slack": {
+    "docker_image": "mcp/slack:latest",
+    "transport": "stdio",
+    "env_vars": {
+      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+      "SLACK_TEAM_ID": "${SLACK_TEAM_ID}",
+      "SLACK_CHANNEL_IDS": "${SLACK_CHANNEL_IDS}"
+    },
+    "description": "Slack integration for messaging and notifications",
+    "health_check_timeout": 30
+  },
+  "brave-search": {
+    "docker_image": "mcp/brave-search:latest",
+    "transport": "http",
+    "env_vars": {
+      "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+    },
+    "docker_ports": ["8080:8080"],
+    "health_check_url": "http://localhost:8080/health",
+    "health_check_timeout": 30,
+    "description": "Brave Search for web queries"
+  }
+}
+```
+
+### API Usage Examples
+
+```bash
+# Add multiple servers
+curl -X POST "http://localhost:8000/servers/add-docker" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "slack",
+    "docker_image": "mcp/slack",
+    "transport": "stdio",
+    "env_vars": {"SLACK_BOT_TOKEN": "xoxb-..."}
+  }'
+
+curl -X POST "http://localhost:8000/servers/add-docker" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "brave",
+    "docker_image": "mcp/brave-search",
+    "transport": "http",
+    "env_vars": {"BRAVE_API_KEY": "..."},
+    "ports": ["8080:8080"]
+  }'
+
+# Start all servers
+curl -X POST "http://localhost:8000/servers/start-all"
+
+# Check results
+curl "http://localhost:8000/servers"
+curl "http://localhost:8000/tools"
+```
+
+This dynamic server management system allows you to easily add, remove, and configure MCP servers without modifying code or restarting the entire hub! 

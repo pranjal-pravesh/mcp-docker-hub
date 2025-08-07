@@ -1,366 +1,236 @@
-# MCP Hub Server
+# MCP Hub - Centralized API for MCP Tools
 
-A centralized hub server that provides a unified HTTP API for all MCP (Model Context Protocol) tools. This allows external clients to discover and call tools from multiple MCP servers through a single interface.
+A centralized FastAPI server that provides a unified interface for all Model Context Protocol (MCP) tools. This hub allows you to easily manage and interact with multiple MCP servers through a single API endpoint.
 
-## 📁 Project Structure
+## 🚀 Features
 
-```
-mcp-hub/
-├── README.md                    # This file
-├── requirements.txt             # Python dependencies
-├── setup.py                     # Package setup
-├── Makefile                     # Development tasks
-├── env.example                  # Environment variables template
-├── src/                         # Source code
-│   └── mcp_hub/                # Main package
-│       ├── __init__.py         # Package initialization
-│       ├── mcp_hub_server.py   # FastAPI server implementation
-│       ├── mcp_manager.py      # MCP server management
-│       ├── mcp_cli.py          # Command-line interface
-│       └── tool_adapter.py     # Unified tool interface
-├── scripts/                     # Executable scripts
-│   ├── run_hub.py              # Main server runner
-│   └── start.sh                # Quick startup script
-├── tests/                       # Test files
-│   ├── test_mcp_hub.py         # Test suite
-│   └── mcp_hub_client.py       # Example client
-├── docs/                        # Documentation
-│   └── DEPLOYMENT_GUIDE.md     # Detailed deployment guide
-├── deployment/                  # Deployment configurations
-│   ├── Dockerfile              # Production Docker container
-│   ├── docker-compose.yml      # Local deployment with monitoring
-│   ├── railway.json            # Railway cloud deployment
-│   ├── render.yaml             # Render cloud deployment
-│   └── deploy.sh               # Automated deployment script
-└── configs/                     # Configuration files (future use)
-```
+- **Centralized API**: Single endpoint for all MCP tools
+- **Dynamic Server Management**: Add/remove Docker MCP servers effortlessly
+- **Multiple Transport Support**: stdio, http, sse
+- **Interactive Documentation**: Swagger UI and ReDoc
+- **Health Monitoring**: Built-in health checks and status endpoints
+- **Environment Variable Management**: Automatic configuration from .env files
+- **Docker Support**: Run MCP servers in containers with proper isolation
 
-## 🚀 Quick Start
+## 🛠️ Quick Setup
 
 ### Prerequisites
-
 - Python 3.11+
-- Docker (for containerized deployment)
-- Node.js and npm (for some MCP servers)
+- Docker (for MCP servers)
+- Git
 
-### Local Development
+### Installation
 
-1. **Clone and setup:**
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git
+   cd mcp-docker-hub
+   ```
+
+2. **Set up environment variables**:
+   ```bash
+   cp env.example .env
+   # Edit .env with your API keys
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+4. **Start the hub**:
+   ```bash
+   python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
+   ```
+
+5. **Access the API**:
+   - Main API: http://localhost:8000
+   - Documentation: http://localhost:8000/docs
+   - Health Check: http://localhost:8000/
+
+## 🌐 Google Cloud VM Deployment
+
+### Automated Deployment
+
+1. **Create a Google Cloud VM** (f1-micro recommended for free tier):
+   ```bash
+   gcloud compute instances create mcp-hub \
+     --zone=us-central1-a \
+     --machine-type=f1-micro \
+     --image-family=ubuntu-2204-lts \
+     --image-project=ubuntu-os-cloud \
+     --tags=http-server,https-server \
+     --metadata=startup-script='#! /bin/bash
+     curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash'
+   ```
+
+2. **SSH into the VM**:
+   ```bash
+   gcloud compute ssh mcp-hub --zone=us-central1-a
+   ```
+
+3. **Run the deployment script**:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash
+   ```
+
+### Manual Deployment
+
+1. **SSH into your VM**:
+   ```bash
+   gcloud compute ssh YOUR_VM_NAME --zone=YOUR_ZONE
+   ```
+
+2. **Clone and run the deployment script**:
+   ```bash
+   git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git
+   cd mcp-docker-hub
+   chmod +x deploy-gcp.sh
+   ./deploy-gcp.sh
+   ```
+
+### Firewall Configuration
+
+Allow port 8000 in your Google Cloud firewall:
 ```bash
-git clone <your-repo-url>
-cd mcp-hub
+gcloud compute firewall-rules create allow-mcp-hub \
+  --allow tcp:8000 \
+  --target-tags=http-server \
+  --description="Allow MCP Hub traffic"
 ```
 
-2. **Setup environment:**
+## 🔧 Dynamic MCP Server Management
+
+### Adding Docker MCP Servers
+
+#### Via API
 ```bash
-# Install dependencies and setup environment
-make setup
-
-# Or manually:
-pip install -r requirements.txt
-pip install -e .
-cp env.example .env
-# Edit .env with your API keys
+curl -X POST "http://localhost:8000/servers/add-docker" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-server",
+    "docker_image": "mcp/my-server",
+    "transport": "stdio",
+    "env_vars": {"API_KEY": "your-key"}
+  }'
 ```
 
-3. **Start development server:**
+#### Via CLI
 ```bash
-# Using Makefile
-make dev
-
-# Or using the startup script
-./scripts/start.sh
-
-# Or manually
-python scripts/run_hub.py --dev --add-all-servers
+python scripts/manage_mcp_servers.py add \
+  --name my-server \
+  --docker-image mcp/my-server \
+  --transport stdio \
+  --env-vars '{"API_KEY": "your-key"}'
 ```
 
-### Google Cloud VM Deployment (Recommended)
-
-For production deployment with full Docker support:
-
-1. **Follow the complete guide**: [Google Cloud Setup Guide](GOOGLE_CLOUD_SETUP.md)
-
-2. **Quick deployment**:
-```bash
-# On your Google Cloud VM
-curl -O https://raw.githubusercontent.com/yourusername/mcp-hub/main/deploy-gcp.sh
-chmod +x deploy-gcp.sh
-./deploy-gcp.sh
-```
-
-3. **Access your MCP Hub**:
-```
-http://YOUR_VM_IP:8000
-```
-
-### Docker Deployment (Local)
-
-```bash
-# Local Docker deployment
-make deploy-local
-
-# Or manually
-docker-compose up -d
-```
-
-### Dynamic Docker MCP Server Management
-
-The MCP Hub now supports effortless addition and removal of any Docker MCP server with minimal configuration changes:
-
-#### Quick Setup (Recommended)
-```bash
-# Interactive environment setup
-python scripts/setup_env.py
-
-# Check which servers are available
-python scripts/check_servers.py
-
-# Start hub with available servers
-python -m mcp_hub.mcp_hub_server --load-config
-```
-
-#### Using the CLI Tool
-```bash
-# Add a new server
-python scripts/manage_mcp_servers.py add my-slack mcp/slack --env-vars SLACK_BOT_TOKEN SLACK_TEAM_ID
-
-# Add a server with HTTP transport
-python scripts/manage_mcp_servers.py add brave mcp/brave-search --transport http --ports 8080:8080
-
-# List all servers
-python scripts/manage_mcp_servers.py list
-
-# Remove a server
-python scripts/manage_mcp_servers.py remove my-slack
-```
-
-#### Using JSON Configuration
-Edit `configs/mcp_servers.json` to add or remove servers:
+#### Via JSON Configuration
+Edit `configs/mcp_servers.json`:
 ```json
 {
-  "servers": {
-    "my-custom-server": {
-      "docker_image": "mcp/my-custom-server",
-      "transport": "stdio",
-      "env_vars": {"API_KEY": "${MY_API_KEY}"},
-      "description": "My custom MCP server"
+  "my-server": {
+    "docker_image": "mcp/my-server",
+    "transport": "stdio",
+    "env_vars": {
+      "API_KEY": "your-key"
     }
   }
 }
 ```
 
-#### Using the REST API
+### Removing Servers
 ```bash
-# Check server availability
-curl "http://localhost:8000/servers/check-availability"
+# Via API
+curl -X DELETE "http://localhost:8000/servers/my-server"
 
-# Add a server via API
-curl -X POST "http://localhost:8000/servers/add-docker" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-server", "docker_image": "mcp/slack", "env_vars": {"SLACK_BOT_TOKEN": "xoxb-..."}}'
-
-# Load configuration from file
-curl -X POST "http://localhost:8000/servers/load-config"
+# Via CLI
+python scripts/manage_mcp_servers.py remove --name my-server
 ```
 
-#### Start Hub with Configuration
-```bash
-# Load all servers from config file on startup
-python -m mcp_hub.mcp_hub_server --load-config
-```
+## 📋 Available API Endpoints
 
-**Note**: Servers with missing environment variables will be automatically skipped, so you can configure only the servers you need.
+### Core Endpoints
+- `GET /` - Server status and health check
+- `GET /docs` - Interactive API documentation
+- `GET /redoc` - Alternative API documentation
 
-For detailed documentation, see [Dynamic MCP Server Management](docs/DYNAMIC_MCP_SERVERS.md).
-
-### Docker Deployment
-
-```bash
-# Local Docker deployment
-make deploy-local
-
-# Or manually
-./deployment/deploy.sh local
-```
-
-### Cloud Deployment
-
-```bash
-# Railway (recommended)
-./deployment/deploy.sh railway
-
-# Render
-./deployment/deploy.sh render
-```
-
-## 🔧 Core Components
-
-### `src/mcp_hub/mcp_hub_server.py`
-- FastAPI-based HTTP server
-- Unified API for all MCP tools
-- Auto-generated documentation
-- Health checks and monitoring
-
-### `src/mcp_hub/mcp_manager.py`
-- Manages MCP server connections
-- Handles different transport protocols (stdio, HTTP, SSE)
-- Server lifecycle management
-- Tool discovery
-
-### `src/mcp_hub/tool_adapter.py`
-- Unified interface for all MCP protocols
-- Transparent tool calling
-- Protocol abstraction layer
-
-### `src/mcp_hub/mcp_cli.py`
-- Interactive command-line interface
-- Server management commands
-- Tool testing and debugging
-
-## 📋 API Endpoints
-
-- `GET /` - Server status and health
+### Server Management
 - `GET /servers` - List all MCP servers
-- `GET /tools` - List all available tools
-- `GET /tools/{server}` - List tools from specific server
-- `GET /tools/info/{tool}` - Get tool details
-- `POST /tools/call` - Call a tool
-- `POST /servers/{name}/start` - Start a server
-- `POST /servers/{name}/stop` - Stop a server
 - `POST /servers/start-all` - Start all servers
 - `POST /servers/stop-all` - Stop all servers
+- `POST /servers/add-docker` - Add Docker MCP server
+- `DELETE /servers/{name}` - Remove server
 
-## 🛠️ Usage Examples
+### Tool Management
+- `GET /tools` - List all available tools
+- `POST /tools/call` - Call any MCP tool
+- `GET /tools/info/{tool_name}` - Get tool details
 
-### Python Client
+### Configuration
+- `GET /servers/configured` - List configured servers
+- `POST /servers/load-config` - Load from JSON config
+- `POST /servers/save-config` - Save to JSON config
+- `GET /servers/check-availability` - Check server availability
 
-```python
-import asyncio
-import aiohttp
+## 🔍 Troubleshooting
 
-async def use_mcp_hub():
-    async with aiohttp.ClientSession() as session:
-        # List all tools
-        async with session.get("http://localhost:8000/tools") as response:
-            tools = await response.json()
-            print(f"Available tools: {len(tools)}")
-        
-        # Call a tool
-        payload = {
-            "tool_name": "query-wolfram-alpha",
-            "arguments": {"query": "solve x^2 + 5x + 6 = 0"}
-        }
-        async with session.post("http://localhost:8000/tools/call", json=payload) as response:
-            result = await response.json()
-            print(f"Result: {result}")
+### Common Issues
 
-asyncio.run(use_mcp_hub())
-```
+1. **Docker Permission Denied**:
+   ```bash
+   sudo usermod -aG docker $USER
+   newgrp docker
+   ```
 
-### Command Line
+2. **Port Already in Use**:
+   ```bash
+   sudo lsof -i :8000
+   sudo kill -9 <PID>
+   ```
 
-```bash
-# Start hub server
-python scripts/run_hub.py --add-all-servers
+3. **Environment Variables Not Loading**:
+   ```bash
+   python scripts/check_servers.py
+   ```
 
-# Test with client
-python tests/mcp_hub_client.py --demo
+4. **Service Not Starting**:
+   ```bash
+   sudo systemctl status mcp-hub.service
+   sudo journalctl -u mcp-hub.service -f
+   ```
 
-# Run tests
-python tests/test_mcp_hub.py --offline
-```
+### Migration from Docker-in-Docker
 
-## 🔒 Security
-
-- Environment variable management for API keys
-- Non-root Docker containers
-- Health checks and monitoring
-- Rate limiting ready
-- Authentication ready for production
-
-## 📊 Monitoring
-
-- Health check endpoints
-- Prometheus metrics (optional)
-- Grafana dashboards (optional)
-- Structured logging
-- Performance monitoring
-
-## 🌐 Deployment
-
-### Local
-```bash
-make deploy-local
-```
-
-### Railway (Recommended)
-```bash
-./deployment/deploy.sh railway
-```
-
-### Render
-```bash
-./deployment/deploy.sh render
-```
-
-### Custom
-See `docs/DEPLOYMENT_GUIDE.md` for detailed instructions.
-
-## 🔄 Development
-
-### Available Commands
+If you're currently using Docker-in-Docker and experiencing permission issues:
 
 ```bash
-make help          # Show all available commands
-make setup         # Initial setup
-make dev           # Start development server
-make test          # Run offline tests
-make test-online   # Run online tests
-make clean         # Clean up cache files
-make deploy-local  # Deploy locally with Docker
+# Run the migration script
+./migrate-to-direct.sh
 ```
 
-### Adding New MCP Servers
-
-1. Add server configuration to `src/mcp_hub/mcp_manager.py`
-2. Add API endpoints to `src/mcp_hub/mcp_hub_server.py`
-3. Update deployment configurations if needed
-
-### Testing
-
-```bash
-# Run offline tests
-make test
-
-# Run online tests (requires running server)
-make test-online
-
-# Test client
-python tests/mcp_hub_client.py --demo
-```
+This will:
+- Stop the Docker container
+- Set up a Python virtual environment
+- Create a systemd service
+- Start the MCP Hub directly on the host
 
 ## 📚 Documentation
 
-- **API Docs**: Available at `/docs` when server is running
-- **Deployment Guide**: `docs/DEPLOYMENT_GUIDE.md`
-- **Examples**: `tests/` directory
+- [Dynamic MCP Servers Guide](docs/DYNAMIC_MCP_SERVERS.md)
+- [Google Cloud Setup Guide](GOOGLE_CLOUD_SETUP.md)
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests
+4. Add tests if applicable
 5. Submit a pull request
 
-## 📞 Support
+## 📄 License
 
-- Check the deployment guide for troubleshooting
-- Review API documentation at `/docs`
-- Check server logs for detailed error messages
-- Test with the provided examples
-
----
-
-**Your MCP Hub Server is now organized and ready for production use!** 🎉 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 

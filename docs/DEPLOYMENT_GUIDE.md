@@ -1,530 +1,457 @@
-# MCP Hub Server Deployment Guide
+# MCP Hub Deployment Guide
 
-This guide covers deploying the MCP Hub Server to various cloud platforms with Docker support for production use.
+This guide covers different deployment options for the MCP Hub, with a focus on the recommended direct Python execution approach.
 
-## 🚀 Quick Deploy Options
+## 🎯 Recommended Approach: Direct Python Execution
 
-### 1. Railway (Recommended for Quick Start)
-- **Pros**: Easy deployment, automatic HTTPS, good free tier
-- **Cons**: Limited resources on free tier
-- **Best for**: Development, testing, small production workloads
+The recommended deployment approach is to run the MCP Hub directly on the host system using Python, while still using Docker for individual MCP servers. This avoids the complexity of Docker-in-Docker and provides better reliability.
 
-### 2. Render
-- **Pros**: Good free tier, automatic HTTPS, easy setup
-- **Cons**: Cold starts on free tier
-- **Best for**: Small to medium production workloads
+## 🚀 Google Cloud VM Deployment (Recommended)
 
-### 3. DigitalOcean App Platform
-- **Pros**: Reliable, good performance, reasonable pricing
-- **Cons**: No free tier
-- **Best for**: Production workloads
+### Quick Start
 
-### 4. AWS/GCP/Azure
-- **Pros**: Full control, scalable, enterprise features
-- **Cons**: More complex setup, higher cost
-- **Best for**: Large scale production, enterprise use
+```bash
+# 1. Create VM
+gcloud compute instances create mcp-hub \
+  --zone=us-central1-a \
+  --machine-type=f1-micro \
+  --image-family=ubuntu-2204-lts \
+  --image-project=ubuntu-os-cloud \
+  --tags=http-server,https-server
 
-## 📋 Prerequisites
+# 2. SSH and deploy
+gcloud compute ssh mcp-hub --zone=us-central1-a
+curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash
 
-### Required Accounts
-- GitHub account (for code hosting)
-- Cloud platform account (Railway, Render, etc.)
-- Docker Hub account (optional, for custom images)
-
-### Required Tools
-- Docker installed locally
-- Git
-- API keys for MCP services (Slack, Brave Search, Wolfram Alpha)
-
-## 🐳 Docker Deployment
-
-### Local Docker Setup
-
-1. **Create Dockerfile**
-```dockerfile
-# Dockerfile
-FROM python:3.11-slim
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    nodejs \
-    npm \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /app
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY src/ ./src/
-COPY run_mcp_hub.py .
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
-
-# Start the application
-CMD ["python", "run_mcp_hub.py", "--host", "0.0.0.0", "--port", "8000"]
+# 3. Configure firewall
+gcloud compute firewall-rules create allow-mcp-hub \
+  --allow tcp:8000 \
+  --target-tags=http-server
 ```
 
-2. **Create docker-compose.yml**
+### Manual Setup
+
+1. **Install Dependencies**
+   ```bash
+   sudo apt-get update && sudo apt-get upgrade -y
+   sudo apt-get install -y python3 python3-pip python3-venv git curl
+   
+   # Install Docker for MCP servers
+   curl -fsSL https://get.docker.com -o get-docker.sh
+   sudo sh get-docker.sh
+   sudo usermod -aG docker $USER
+   rm get-docker.sh
+   newgrp docker
+   ```
+
+2. **Clone and Setup**
+   ```bash
+   git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git
+   cd mcp-docker-hub
+   
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   pip install -e .
+   ```
+
+3. **Configure Environment**
+   ```bash
+   cp env.example .env
+   nano .env  # Add your API keys
+   ```
+
+4. **Create Systemd Service**
+   ```bash
+   sudo tee /etc/systemd/system/mcp-hub.service > /dev/null << EOF
+   [Unit]
+   Description=MCP Hub Server
+   After=network.target docker.service
+   Requires=docker.service
+   
+   [Service]
+   Type=simple
+   User=$USER
+   WorkingDirectory=$(pwd)
+   Environment=PATH=$(pwd)/venv/bin
+   ExecStart=$(pwd)/venv/bin/python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
+   Restart=always
+   RestartSec=10
+   
+   [Install]
+   WantedBy=multi-user.target
+   EOF
+   
+   sudo systemctl daemon-reload
+   sudo systemctl enable mcp-hub.service
+   sudo systemctl start mcp-hub.service
+   ```
+
+## 🐳 Docker Deployment (Alternative)
+
+### Local Docker Deployment
+
+```bash
+# Build and run
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+### Docker Compose Configuration
+
 ```yaml
-# docker-compose.yml
 version: '3.8'
 
 services:
   mcp-hub:
-    build: .
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
     ports:
       - "8000:8000"
     environment:
+      - PORT=8000
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
-      - SLACK_TEAM_ID=${SLACK_TEAM_ID}
-      - SLACK_CHANNEL_IDS=${SLACK_CHANNEL_IDS}
       - BRAVE_API_KEY=${BRAVE_API_KEY}
-      - WOLFRAM_API_KEY=${WOLFRAM_API_KEY}
+      # ... other environment variables
     volumes:
       - ./logs:/app/logs
+      - ./configs:/app/configs
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    networks:
+      - mcp-network
 
-  # Optional: Add Redis for session management
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-volumes:
-  redis_data:
+networks:
+  mcp-network:
+    driver: bridge
 ```
 
-3. **Build and Run Locally**
+## 🔧 Development Setup
+
+### Local Development
+
 ```bash
-# Build the image
-docker build -t mcp-hub-server .
+# Clone repository
+git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git
+cd mcp-docker-hub
 
-# Run with docker-compose
-docker-compose up -d
+# Setup virtual environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
 
-# Check logs
-docker-compose logs -f mcp-hub
+# Configure environment
+cp env.example .env
+# Edit .env with your API keys
+
+# Start development server
+python -m mcp_hub.mcp_hub_server --dev --load-config
 ```
 
-## ☁️ Cloud Deployment
+### Development with Docker
+
+```bash
+# Build development image
+docker build -f deployment/Dockerfile -t mcp-hub:dev .
+
+# Run with volume mounts for development
+docker run -it --rm \
+  -p 8000:8000 \
+  -v $(pwd):/app \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --env-file .env \
+  mcp-hub:dev
+```
+
+## 🌐 Cloud Platform Deployments
 
 ### Railway Deployment
 
-1. **Prepare Your Repository**
-```bash
-# Add Railway configuration
-mkdir .railway
-```
-
-2. **Create railway.json**
-```json
-{
-  "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "DOCKERFILE"
-  },
-  "deploy": {
-    "startCommand": "python run_mcp_hub.py --host 0.0.0.0 --port $PORT",
-    "healthcheckPath": "/",
-    "healthcheckTimeout": 300,
-    "restartPolicyType": "ON_FAILURE"
-  }
-}
-```
-
-3. **Deploy to Railway**
 ```bash
 # Install Railway CLI
 npm install -g @railway/cli
 
-# Login to Railway
+# Login and deploy
 railway login
-
-# Initialize project
 railway init
-
-# Add environment variables
-railway variables set SLACK_BOT_TOKEN=your_token
-railway variables set SLACK_TEAM_ID=your_team_id
-railway variables set BRAVE_API_KEY=your_key
-railway variables set WOLFRAM_API_KEY=your_key
-
-# Deploy
 railway up
 ```
 
 ### Render Deployment
 
-1. **Create render.yaml**
-```yaml
-services:
-  - type: web
-    name: mcp-hub-server
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run_mcp_hub.py --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
-    envVars:
-      - key: SLACK_BOT_TOKEN
-        sync: false
-      - key: SLACK_TEAM_ID
-        sync: false
-      - key: BRAVE_API_KEY
-        sync: false
-      - key: WOLFRAM_API_KEY
-        sync: false
-```
-
-2. **Deploy to Render**
-- Connect your GitHub repository
-- Set environment variables in Render dashboard
-- Deploy automatically on push
-
-### DigitalOcean App Platform
-
-1. **Create app.yaml**
-```yaml
-name: mcp-hub-server
-services:
-  - name: web
-    source_dir: /
-    github:
-      repo: your-username/your-repo
-      branch: main
-    run_command: python run_mcp_hub.py --host 0.0.0.0 --port $PORT
-    environment_slug: python
-    instance_count: 1
-    instance_size_slug: basic-xxs
-    health_check:
-      http_path: /
-    envs:
-      - key: SLACK_BOT_TOKEN
-        scope: RUN_AND_BUILD_TIME
-        value: ${SLACK_BOT_TOKEN}
-      - key: SLACK_TEAM_ID
-        scope: RUN_AND_BUILD_TIME
-        value: ${SLACK_TEAM_ID}
-      - key: BRAVE_API_KEY
-        scope: RUN_AND_BUILD_TIME
-        value: ${BRAVE_API_KEY}
-      - key: WOLFRAM_API_KEY
-        scope: RUN_AND_BUILD_TIME
-        value: ${WOLFRAM_API_KEY}
-```
-
-### AWS ECS Deployment
-
-1. **Create task-definition.json**
-```json
-{
-  "family": "mcp-hub-server",
-  "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512",
-  "executionRoleArn": "arn:aws:iam::your-account:role/ecsTaskExecutionRole",
-  "containerDefinitions": [
-    {
-      "name": "mcp-hub",
-      "image": "your-account/mcp-hub-server:latest",
-      "portMappings": [
-        {
-          "containerPort": 8000,
-          "protocol": "tcp"
-        }
-      ],
-      "environment": [
-        {
-          "name": "SLACK_BOT_TOKEN",
-          "value": "your-token"
-        },
-        {
-          "name": "SLACK_TEAM_ID",
-          "value": "your-team-id"
-        },
-        {
-          "name": "BRAVE_API_KEY",
-          "value": "your-key"
-        },
-        {
-          "name": "WOLFRAM_API_KEY",
-          "value": "your-key"
-        }
-      ],
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/mcp-hub-server",
-          "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      },
-      "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"],
-        "interval": 30,
-        "timeout": 5,
-        "retries": 3,
-        "startPeriod": 60
-      }
-    }
-  ]
-}
-```
-
-2. **Deploy to ECS**
 ```bash
-# Build and push Docker image
-docker build -t mcp-hub-server .
-docker tag mcp-hub-server:latest your-account/mcp-hub-server:latest
-docker push your-account/mcp-hub-server:latest
+# Connect your GitHub repository to Render
+# Render will automatically detect the Python app and deploy
+```
 
-# Create ECS cluster and service
-aws ecs create-cluster --cluster-name mcp-hub-cluster
-aws ecs register-task-definition --cli-input-json file://task-definition.json
-aws ecs create-service --cluster mcp-hub-cluster --service-name mcp-hub-service --task-definition mcp-hub-server:1 --desired-count 1
+### Heroku Deployment
+
+```bash
+# Install Heroku CLI
+curl https://cli-assets.heroku.com/install.sh | sh
+
+# Create app and deploy
+heroku create your-mcp-hub
+git push heroku main
+```
+
+## 📋 Environment Configuration
+
+### Required Environment Variables
+
+```bash
+# Core Configuration
+PORT=8000
+HOST=0.0.0.0
+
+# Slack Configuration
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_TEAM_ID=your-team-id
+SLACK_CHANNEL_IDS=channel1,channel2
+
+# Brave Search Configuration
+BRAVE_API_KEY=your-brave-api-key
+
+# Wolfram Alpha Configuration
+WOLFRAM_API_KEY=your-wolfram-api-key
+
+# OpenWeather Configuration
+OPENWEATHER_API_KEY=your-openweather-api-key
+
+# Optional Services
+GITHUB_TOKEN=your-github-token
+POSTGRES_CONNECTION_STRING=your-postgres-connection
+REDIS_URL=your-redis-url
+NEWS_API_KEY=your-news-api-key
+```
+
+### Environment Setup Script
+
+```bash
+# Interactive environment setup
+python scripts/setup_env.py
+
+# Check server availability
+python scripts/check_servers.py
+```
+
+## 🔍 Monitoring and Logging
+
+### Log Management
+
+```bash
+# View service logs (systemd)
+sudo journalctl -u mcp-hub.service -f
+
+# View application logs
+tail -f logs/mcp-hub.log
+
+# View Docker logs
+docker logs <container_name>
+```
+
+### Health Checks
+
+```bash
+# Service health
+curl http://localhost:8000/
+
+# Server status
+curl http://localhost:8000/servers
+
+# Tools availability
+curl http://localhost:8000/tools
+```
+
+### Performance Monitoring
+
+```bash
+# System resources
+htop
+df -h
+free -h
+
+# Docker resources
+docker system df
+docker stats
 ```
 
 ## 🔒 Security Considerations
 
-### Environment Variables
-- Never commit API keys to version control
-- Use platform-specific secret management
+### Firewall Configuration
+
+```bash
+# Google Cloud
+gcloud compute firewall-rules create allow-mcp-hub \
+  --allow tcp:8000 \
+  --target-tags=http-server
+
+# Local firewall (UFW)
+sudo ufw allow 8000
+sudo ufw enable
+```
+
+### SSL/HTTPS Setup
+
+```bash
+# Install nginx and certbot
+sudo apt-get install nginx certbot python3-certbot-nginx
+
+# Configure SSL
+sudo certbot --nginx -d your-domain.com
+```
+
+### API Key Security
+
+- Store API keys in environment variables
+- Never commit `.env` files to version control
+- Use different keys for different environments
 - Rotate keys regularly
 
-### Network Security
-```python
-# Add to mcp_hub_server.py for production
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+## 🚨 Troubleshooting
 
-security = HTTPBearer()
+### Common Issues
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials.credentials != "your-secret-token":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
-        )
-    return credentials.credentials
+1. **Service Not Starting**
+   ```bash
+   # Check logs
+   sudo journalctl -u mcp-hub.service -f
+   
+   # Check port availability
+   sudo lsof -i :8000
+   ```
 
-# Add to your endpoints
-@app.get("/tools")
-async def list_tools(token: str = Depends(verify_token)):
-    # Your code here
-    pass
-```
+2. **Docker Permission Issues**
+   ```bash
+   # Add user to docker group
+   sudo usermod -aG docker $USER
+   newgrp docker
+   
+   # Test Docker
+   docker run hello-world
+   ```
 
-### Rate Limiting
-```python
-# Add rate limiting
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+3. **Environment Variables Not Loading**
+   ```bash
+   # Check .env file
+   cat .env
+   
+   # Test environment loading
+   python scripts/check_servers.py
+   ```
 
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+4. **MCP Servers Not Starting**
+   ```bash
+   # Check Docker containers
+   docker ps -a
+   
+   # Check MCP server logs
+   docker logs <container_name>
+   
+   # Test individual server
+   curl -X POST http://localhost:8000/servers/slack/start
+   ```
 
-@app.get("/tools")
-@limiter.limit("10/minute")
-async def list_tools(request: Request):
-    # Your code here
-    pass
-```
+### Debug Commands
 
-## 📊 Monitoring and Logging
-
-### Health Checks
-```python
-# Enhanced health check endpoint
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0",
-        "uptime": time.time() - start_time,
-        "servers": len(mcp_manager.active_connections),
-        "tools": len(tool_hub.tool_registry)
-    }
-```
-
-### Logging Configuration
-```python
-# Add to mcp_hub_server.py
-import logging
-from logging.handlers import RotatingFileHandler
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        RotatingFileHandler('logs/mcp_hub.log', maxBytes=10000000, backupCount=5),
-        logging.StreamHandler()
-    ]
-)
-```
-
-### Metrics (Optional)
-```python
-# Add Prometheus metrics
-from prometheus_client import Counter, Histogram, generate_latest
-
-# Define metrics
-tool_calls_total = Counter('tool_calls_total', 'Total tool calls', ['tool_name', 'server_name'])
-tool_call_duration = Histogram('tool_call_duration_seconds', 'Tool call duration', ['tool_name'])
-
-@app.get("/metrics")
-async def metrics():
-    return Response(generate_latest(), media_type="text/plain")
-```
-
-## 🔧 Production Optimizations
-
-### Performance Tuning
-```python
-# Add connection pooling
-import asyncio
-import aiohttp
-
-# Configure connection limits
-connector = aiohttp.TCPConnector(
-    limit=100,
-    limit_per_host=30,
-    ttl_dns_cache=300,
-    use_dns_cache=True
-)
-
-# Use in your HTTP clients
-async with aiohttp.ClientSession(connector=connector) as session:
-    # Your HTTP requests
-    pass
-```
-
-### Caching
-```python
-# Add Redis caching
-import redis.asyncio as redis
-
-redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
-
-@app.get("/tools")
-async def list_tools():
-    # Try cache first
-    cached = await redis_client.get("tools_list")
-    if cached:
-        return json.loads(cached)
-    
-    # Get fresh data
-    tools = get_all_tools()
-    
-    # Cache for 5 minutes
-    await redis_client.setex("tools_list", 300, json.dumps(tools))
-    return tools
-```
-
-## 🚀 Deployment Checklist
-
-### Pre-Deployment
-- [ ] All API keys configured
-- [ ] Environment variables set
-- [ ] Docker image built and tested
-- [ ] Health checks implemented
-- [ ] Logging configured
-- [ ] Security measures in place
-
-### Post-Deployment
-- [ ] Health check endpoint responding
-- [ ] All MCP servers starting correctly
-- [ ] Tools being discovered
-- [ ] API documentation accessible
-- [ ] Monitoring alerts configured
-- [ ] Backup strategy in place
-
-## 🔗 Example Deployments
-
-### Railway (Easiest)
 ```bash
-# 1. Fork/clone your repository
-git clone https://github.com/your-username/your-repo
-cd your-repo
+# Check service status
+sudo systemctl status mcp-hub.service
 
-# 2. Add Railway configuration files
-# (railway.json and Dockerfile as shown above)
+# Check configuration
+python scripts/check_servers.py
 
-# 3. Push to GitHub
-git add .
-git commit -m "Add Railway deployment config"
-git push
+# Test API endpoints
+curl http://localhost:8000/
+curl http://localhost:8000/servers
+curl http://localhost:8000/tools
 
-# 4. Deploy on Railway
-railway login
-railway init
-railway up
+# Check Docker
+docker ps
+docker images
 ```
 
-### Render (Alternative)
+## 📊 Performance Optimization
+
+### Resource Limits
+
 ```bash
-# 1. Connect GitHub repository to Render
-# 2. Add render.yaml configuration
-# 3. Set environment variables in Render dashboard
-# 4. Deploy automatically
+# Monitor resource usage
+htop
+docker stats
+
+# Optimize Docker
+docker system prune -a
+```
+
+### Scaling Considerations
+
+- Use load balancers for high traffic
+- Implement caching for frequently accessed data
+- Monitor and optimize database connections
+- Consider using CDN for static assets
+
+## 🔄 Updates and Maintenance
+
+### Application Updates
+
+```bash
+# Update code
+git pull origin main
+
+# Update dependencies
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+
+# Restart service
+sudo systemctl restart mcp-hub.service
+```
+
+### System Updates
+
+```bash
+# Update system packages
+sudo apt-get update && sudo apt-get upgrade -y
+
+# Update Docker
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+```
+
+### Backup Strategy
+
+```bash
+# Backup configuration
+cp .env .env.backup
+cp configs/mcp_servers.json configs/mcp_servers.json.backup
+
+# Backup logs
+tar -czf logs-backup-$(date +%Y%m%d).tar.gz logs/
 ```
 
 ## 📞 Support
 
-For deployment issues:
-1. Check platform-specific logs
-2. Verify environment variables
-3. Test locally with Docker first
-4. Check health check endpoints
-5. Review platform documentation
+For additional help:
 
-## 🔄 CI/CD Pipeline
+1. Check the [README.md](../README.md) for basic setup
+2. Review the [Google Cloud Setup Guide](../GOOGLE_CLOUD_SETUP.md)
+3. Check logs for specific error messages
+4. Create an issue in the repository
 
-### GitHub Actions Example
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Railway
+## 🎉 Success Checklist
 
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      
-      - name: Deploy to Railway
-        uses: railway/deploy@v1
-        with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
-```
-
-This deployment guide covers all major cloud platforms and provides production-ready configurations for hosting your MCP Hub Server on the internet! 
+- [ ] MCP Hub service is running
+- [ ] API is accessible at `/docs`
+- [ ] Environment variables are configured
+- [ ] MCP servers are starting successfully
+- [ ] Tools are being discovered
+- [ ] Firewall is configured
+- [ ] Monitoring is set up
+- [ ] Backups are configured 

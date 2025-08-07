@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # MCP Server Environment Variables
+      - PORT=8000
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
       - SLACK_TEAM_ID=${SLACK_TEAM_ID}
       - SLACK_CHANNEL_IDS=${SLACK_CHANNEL_IDS}
@@ -19,12 +19,15 @@ services:
       - REDIS_URL=${REDIS_URL}
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
       - NEWS_API_KEY=${NEWS_API_KEY}
-      # Server Configuration
-      - HOST=0.0.0.0
-      - PORT=8000
+      - GOOGLE_CALENDAR_CREDENTIALS=${GOOGLE_CALENDAR_CREDENTIALS}
+      - GOOGLE_CALENDAR_TOKEN=${GOOGLE_CALENDAR_TOKEN}
+      # Docker access environment variables
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
       - ./logs:/app/logs
+      - ./configs:/app/configs
       - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker:/var/lib/docker
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -34,6 +37,8 @@ services:
       start_period: 40s
     networks:
       - mcp-network
+    # Run as root to ensure Docker access, but switch to appuser in the container
+    user: "0:0"
 
 networks:
   mcp-network:

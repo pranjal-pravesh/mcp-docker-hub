@@ -1,129 +1,159 @@
 #!/bin/bash
 set -e
 
-echo "🚀 MCP Hub - Google Cloud VM Deployment Script"
-echo "================================================"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Function to print colored output
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-    print_error "Please don't run this script as root. Use a regular user."
-    exit 1
-fi
-
-print_status "Starting MCP Hub deployment..."
+echo "🚀 Starting MCP Hub deployment on Google Cloud VM..."
 
 # Update system packages
-print_status "Updating system packages..."
-sudo apt update && sudo apt upgrade -y
+echo "📦 Updating system packages..."
+sudo apt-get update && sudo apt-get upgrade -y
 
 # Install Docker
-print_status "Installing Docker..."
-sudo apt install -y docker.io docker-compose
+echo "🐳 Installing Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    rm get-docker.sh
+    echo "✅ Docker installed successfully"
+else
+    echo "✅ Docker already installed"
+fi
 
-# Start and enable Docker
-print_status "Starting Docker service..."
-sudo systemctl enable docker
-sudo systemctl start docker
+# Install Python and pip
+echo "🐍 Installing Python and pip..."
+sudo apt-get install -y python3 python3-pip python3-venv
 
-# Add current user to docker group
-print_status "Adding user to docker group..."
-sudo usermod -aG docker $USER
-
-# Reload shell to apply docker group
-print_status "Reloading shell to apply docker group..."
-newgrp docker
-
-# Test Docker installation
-print_status "Testing Docker installation..."
-docker run hello-world
+# Install git if not present
+if ! command -v git &> /dev/null; then
+    sudo apt-get install -y git
+fi
 
 # Create project directory
-PROJECT_DIR="$HOME/mcp-hub"
-print_status "Setting up project directory: $PROJECT_DIR"
+PROJECT_DIR="/home/$USER/mcp-docker-hub"
+echo "📁 Setting up project directory: $PROJECT_DIR"
 
 if [ -d "$PROJECT_DIR" ]; then
-    print_warning "Project directory already exists. Updating..."
+    echo "🔄 Updating existing repository..."
     cd "$PROJECT_DIR"
     git pull origin main
 else
-    print_status "Cloning project..."
-    git clone https://github.com/yourusername/mcp-hub.git "$PROJECT_DIR"
+    echo "📥 Cloning repository..."
+    git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git "$PROJECT_DIR"
     cd "$PROJECT_DIR"
 fi
 
+# Create virtual environment
+echo "🔧 Setting up Python virtual environment..."
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Python dependencies
+echo "📦 Installing Python dependencies..."
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+
 # Create .env file if it doesn't exist
 if [ ! -f ".env" ]; then
-    print_status "Creating .env file from template..."
-    cp env.example .env
-    print_warning "Please edit .env file with your API keys before starting the hub."
-    print_warning "You can use: nano .env"
-else
-    print_success ".env file already exists."
+    echo "📝 Creating .env file..."
+    cat > .env << 'EOF'
+# MCP Server Environment Variables
+# Add your API keys and tokens here
+
+# Slack Configuration
+SLACK_BOT_TOKEN=your_slack_bot_token_here
+SLACK_TEAM_ID=your_slack_team_id_here
+SLACK_CHANNEL_IDS=your_channel_ids_here
+
+# Brave Search Configuration
+BRAVE_API_KEY=your_brave_api_key_here
+
+# Wolfram Alpha Configuration
+WOLFRAM_API_KEY=your_wolfram_api_key_here
+
+# GitHub Configuration
+GITHUB_TOKEN=your_github_token_here
+
+# Database Configuration
+POSTGRES_CONNECTION_STRING=your_postgres_connection_string_here
+REDIS_URL=your_redis_url_here
+
+# Weather and News Configuration
+OPENWEATHER_API_KEY=your_openweather_api_key_here
+NEWS_API_KEY=your_news_api_key_here
+
+# Google Calendar Configuration
+GOOGLE_CALENDAR_CREDENTIALS=your_google_calendar_credentials_here
+GOOGLE_CALENDAR_TOKEN=your_google_calendar_token_here
+EOF
+    echo "⚠️  Please edit .env file with your actual API keys and tokens"
 fi
 
-# Create logs directory
-mkdir -p logs
+# Create systemd service for auto-start
+echo "🔧 Creating systemd service for auto-start..."
+sudo tee /etc/systemd/system/mcp-hub.service > /dev/null << EOF
+[Unit]
+Description=MCP Hub Server
+After=network.target docker.service
+Requires=docker.service
 
-# Build and start the MCP Hub
-print_status "Building and starting MCP Hub..."
-docker-compose up -d --build
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$PROJECT_DIR
+Environment=PATH=$PROJECT_DIR/venv/bin
+ExecStart=$PROJECT_DIR/venv/bin/python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
+Restart=always
+RestartSec=10
 
-# Wait for the service to start
-print_status "Waiting for MCP Hub to start..."
-sleep 10
+[Install]
+WantedBy=multi-user.target
+EOF
 
-# Check if the service is running
-if curl -f http://localhost:8000/ > /dev/null 2>&1; then
-    print_success "MCP Hub is running successfully!"
-    print_success "API Documentation: http://localhost:8000/docs"
-    print_success "Health Check: http://localhost:8000/"
-else
-    print_error "MCP Hub failed to start. Check logs with: docker-compose logs"
-    exit 1
-fi
+# Reload systemd and enable service
+sudo systemctl daemon-reload
+sudo systemctl enable mcp-hub.service
 
-# Get external IP
-EXTERNAL_IP=$(curl -s http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip -H "Metadata-Flavor: Google" 2>/dev/null || echo "unknown")
+# Start the service
+echo "🚀 Starting MCP Hub service..."
+sudo systemctl start mcp-hub.service
 
-if [ "$EXTERNAL_IP" != "unknown" ]; then
-    print_success "External IP: $EXTERNAL_IP"
-    print_success "Your MCP Hub is available at: http://$EXTERNAL_IP:8000"
-    print_warning "Make sure port 8000 is open in your firewall rules."
-else
-    print_warning "Could not determine external IP. Check your VM's external IP manually."
-fi
+# Wait a moment for the service to start
+sleep 5
 
-# Show useful commands
+# Check service status
+echo "📊 Checking service status..."
+sudo systemctl status mcp-hub.service --no-pager
+
+# Get VM's external IP
+EXTERNAL_IP=$(curl -s http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip -H "Metadata-Flavor: Google")
+
 echo ""
-print_status "Useful commands:"
-echo "  View logs: docker-compose logs -f"
-echo "  Stop hub: docker-compose down"
-echo "  Restart hub: docker-compose restart"
-echo "  Update hub: git pull && docker-compose up -d --build"
-echo "  Check status: docker-compose ps"
-
-print_success "Deployment completed successfully! 🎉" 
+echo "🎉 MCP Hub deployment completed!"
+echo ""
+echo "📋 Deployment Summary:"
+echo "  • Project directory: $PROJECT_DIR"
+echo "  • Virtual environment: $PROJECT_DIR/venv"
+echo "  • Service: mcp-hub.service"
+echo "  • External IP: $EXTERNAL_IP"
+echo "  • Port: 8000"
+echo ""
+echo "🌐 Access URLs:"
+echo "  • Main API: http://$EXTERNAL_IP:8000"
+echo "  • API Documentation: http://$EXTERNAL_IP:8000/docs"
+echo "  • Health Check: http://$EXTERNAL_IP:8000/"
+echo ""
+echo "🔧 Useful Commands:"
+echo "  • Check service status: sudo systemctl status mcp-hub.service"
+echo "  • View logs: sudo journalctl -u mcp-hub.service -f"
+echo "  • Restart service: sudo systemctl restart mcp-hub.service"
+echo "  • Stop service: sudo systemctl stop mcp-hub.service"
+echo ""
+echo "⚠️  Important:"
+echo "  • Make sure to edit .env file with your actual API keys"
+echo "  • Configure firewall to allow port 8000"
+echo "  • The service will auto-start on VM reboot"
+echo ""
+echo "🔒 Security Note:"
+echo "  • Consider setting up HTTPS with a reverse proxy"
+echo "  • Restrict firewall access to specific IPs if needed" 
