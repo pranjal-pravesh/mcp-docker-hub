@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mcp-hub:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # MCP Server Environment Variables
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_TEAM_ID=${SLACK_TEAM_ID}
+      - SLACK_CHANNEL_IDS=${SLACK_CHANNEL_IDS}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - WOLFRAM_API_KEY=${WOLFRAM_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - POSTGRES_CONNECTION_STRING=${POSTGRES_CONNECTION_STRING}
+      - REDIS_URL=${REDIS_URL}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
+      # Server Configuration
+      - HOST=0.0.0.0
+      - PORT=8000
+    volumes:
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  logs: 

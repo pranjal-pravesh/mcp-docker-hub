@@ -1,11 +1,13 @@
 # Dockerfile for MCP Hub Server
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies including Docker
 RUN apt-get update && apt-get install -y \
     curl \
     nodejs \
     npm \
+    docker.io \
+    docker-compose \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -26,6 +28,11 @@ RUN mkdir -p logs
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+
+# Add appuser to docker group
+RUN usermod -aG docker appuser
+
+# Switch to appuser
 USER appuser
 
 # Expose port

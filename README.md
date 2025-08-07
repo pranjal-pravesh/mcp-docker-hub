@@ -75,6 +75,35 @@ make dev
 python scripts/run_hub.py --dev --add-all-servers
 ```
 
+### Google Cloud VM Deployment (Recommended)
+
+For production deployment with full Docker support:
+
+1. **Follow the complete guide**: [Google Cloud Setup Guide](GOOGLE_CLOUD_SETUP.md)
+
+2. **Quick deployment**:
+```bash
+# On your Google Cloud VM
+curl -O https://raw.githubusercontent.com/yourusername/mcp-hub/main/deploy-gcp.sh
+chmod +x deploy-gcp.sh
+./deploy-gcp.sh
+```
+
+3. **Access your MCP Hub**:
+```
+http://YOUR_VM_IP:8000
+```
+
+### Docker Deployment (Local)
+
+```bash
+# Local Docker deployment
+make deploy-local
+
+# Or manually
+docker-compose up -d
+```
+
 ### Dynamic Docker MCP Server Management
 
 The MCP Hub now supports effortless addition and removal of any Docker MCP server with minimal configuration changes:
