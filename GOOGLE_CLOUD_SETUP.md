@@ -14,7 +14,7 @@ gcloud compute instances create mcp-hub \
   --image-project=ubuntu-os-cloud \
   --tags=http-server,https-server \
   --metadata=startup-script='#! /bin/bash
-  curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash'
+  curl -fsSL https://raw.githubusercontent.com/pranjal-pravesh/mcp-docker-hub/main/deploy-gcp.sh | bash'
 ```
 
 ### 2. SSH and Deploy
@@ -24,7 +24,7 @@ gcloud compute instances create mcp-hub \
 gcloud compute ssh mcp-hub --zone=us-central1-a
 
 # Run deployment script
-curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash
+curl -fsSL https://raw.githubusercontent.com/pranjal-pravesh/mcp-docker-hub/main/deploy-gcp.sh | bash
 ```
 
 ### 3. Configure Firewall
@@ -152,8 +152,10 @@ Requires=docker.service
 [Service]
 Type=simple
 User=$USER
+Group=docker
 WorkingDirectory=$(pwd)
-Environment=PATH=$(pwd)/venv/bin
+Environment=PATH=$(pwd)/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=DOCKER_HOST=unix:///var/run/docker.sock
 ExecStart=$(pwd)/venv/bin/python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
 Restart=always
 RestartSec=10

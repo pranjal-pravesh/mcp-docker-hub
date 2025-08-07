@@ -7,6 +7,15 @@ echo "🔄 Migrating from Docker-in-Docker to direct Python execution..."
 echo "🛑 Stopping current Docker container..."
 docker-compose down
 
+# Fix Docker permissions
+echo "🔧 Setting up Docker permissions..."
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Test Docker installation
+echo "🧪 Testing Docker installation..."
+docker run hello-world
+
 # Create virtual environment
 echo "🔧 Setting up Python virtual environment..."
 python3 -m venv venv
@@ -29,8 +38,10 @@ Requires=docker.service
 [Service]
 Type=simple
 User=$USER
+Group=docker
 WorkingDirectory=$(pwd)
-Environment=PATH=$(pwd)/venv/bin
+Environment=PATH=$(pwd)/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=DOCKER_HOST=unix:///var/run/docker.sock
 ExecStart=$(pwd)/venv/bin/python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
 Restart=always
 RestartSec=10

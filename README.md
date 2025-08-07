@@ -23,7 +23,7 @@ A centralized FastAPI server that provides a unified interface for all Model Con
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git
+   git clone https://github.com/pranjal-pravesh/mcp-docker-hub.git
    cd mcp-docker-hub
    ```
 
@@ -64,7 +64,7 @@ A centralized FastAPI server that provides a unified interface for all Model Con
      --image-project=ubuntu-os-cloud \
      --tags=http-server,https-server \
      --metadata=startup-script='#! /bin/bash
-     curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash'
+     curl -fsSL https://raw.githubusercontent.com/pranjal-pravesh/mcp-docker-hub/main/deploy-gcp.sh | bash'
    ```
 
 2. **SSH into the VM**:
@@ -74,7 +74,7 @@ A centralized FastAPI server that provides a unified interface for all Model Con
 
 3. **Run the deployment script**:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/pranjalpravesh121/mcp-docker-hub/main/deploy-gcp.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/pranjal-pravesh/mcp-docker-hub/main/deploy-gcp.sh | bash
    ```
 
 ### Manual Deployment
@@ -86,7 +86,7 @@ A centralized FastAPI server that provides a unified interface for all Model Con
 
 2. **Clone and run the deployment script**:
    ```bash
-   git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git
+   git clone https://github.com/pranjal-pravesh/mcp-docker-hub.git
    cd mcp-docker-hub
    chmod +x deploy-gcp.sh
    ./deploy-gcp.sh

@@ -19,6 +19,15 @@ else
     echo "✅ Docker already installed"
 fi
 
+# Fix Docker permissions and reload shell
+echo "🔧 Setting up Docker permissions..."
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Test Docker installation
+echo "🧪 Testing Docker installation..."
+docker run hello-world
+
 # Install Python and pip
 echo "🐍 Installing Python and pip..."
 sudo apt-get install -y python3 python3-pip python3-venv
@@ -38,7 +47,7 @@ if [ -d "$PROJECT_DIR" ]; then
     git pull origin main
 else
     echo "📥 Cloning repository..."
-    git clone https://github.com/pranjalpravesh121/mcp-docker-hub.git "$PROJECT_DIR"
+    git clone https://github.com/pranjal-pravesh/mcp-docker-hub.git "$PROJECT_DIR"
     cd "$PROJECT_DIR"
 fi
 
@@ -89,7 +98,7 @@ EOF
     echo "⚠️  Please edit .env file with your actual API keys and tokens"
 fi
 
-# Create systemd service for auto-start
+# Create systemd service for auto-start with proper Docker configuration
 echo "🔧 Creating systemd service for auto-start..."
 sudo tee /etc/systemd/system/mcp-hub.service > /dev/null << EOF
 [Unit]
@@ -100,8 +109,10 @@ Requires=docker.service
 [Service]
 Type=simple
 User=$USER
+Group=docker
 WorkingDirectory=$PROJECT_DIR
-Environment=PATH=$PROJECT_DIR/venv/bin
+Environment=PATH=$PROJECT_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=DOCKER_HOST=unix:///var/run/docker.sock
 ExecStart=$PROJECT_DIR/venv/bin/python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
 Restart=always
 RestartSec=10
