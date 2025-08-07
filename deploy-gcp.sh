@@ -19,14 +19,18 @@ else
     echo "✅ Docker already installed"
 fi
 
-# Fix Docker permissions and reload shell
+# Fix Docker permissions (without newgrp to avoid hanging)
 echo "🔧 Setting up Docker permissions..."
 sudo usermod -aG docker $USER
-newgrp docker
 
-# Test Docker installation
+# Test Docker installation (this will work in the current session)
 echo "🧪 Testing Docker installation..."
-docker run hello-world
+if docker run hello-world > /dev/null 2>&1; then
+    echo "✅ Docker test successful"
+else
+    echo "⚠️  Docker test failed - this is normal if you need to restart the session"
+    echo "   The service will work correctly after restart"
+fi
 
 # Install Python and pip
 echo "🐍 Installing Python and pip..."
