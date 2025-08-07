@@ -19,11 +19,32 @@ else
     echo "✅ Docker already installed"
 fi
 
-# Fix Docker permissions (without newgrp to avoid hanging)
+# Fix Docker permissions and ensure Docker is ready
 echo "🔧 Setting up Docker permissions..."
 sudo usermod -aG docker $USER
 
-# Test Docker installation (this will work in the current session)
+# Ensure Docker service is running and ready
+echo "🔧 Ensuring Docker service is ready..."
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Wait for Docker to be fully ready
+echo "⏳ Waiting for Docker to be ready..."
+timeout=30
+counter=0
+while ! docker info > /dev/null 2>&1 && [ $counter -lt $timeout ]; do
+    echo "   Waiting for Docker... ($counter/$timeout)"
+    sleep 1
+    counter=$((counter + 1))
+done
+
+if docker info > /dev/null 2>&1; then
+    echo "✅ Docker is ready"
+else
+    echo "⚠️  Docker may not be fully ready, but continuing..."
+fi
+
+# Test Docker installation
 echo "🧪 Testing Docker installation..."
 if docker run hello-world > /dev/null 2>&1; then
     echo "✅ Docker test successful"
@@ -66,41 +87,9 @@ pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
 
-# Create .env file if it doesn't exist
-if [ ! -f ".env" ]; then
-    echo "📝 Creating .env file..."
-    cat > .env << 'EOF'
-# MCP Server Environment Variables
-# Add your API keys and tokens here
-
-# Slack Configuration
-SLACK_BOT_TOKEN=your_slack_bot_token_here
-SLACK_TEAM_ID=your_slack_team_id_here
-SLACK_CHANNEL_IDS=your_channel_ids_here
-
-# Brave Search Configuration
-BRAVE_API_KEY=your_brave_api_key_here
-
-# Wolfram Alpha Configuration
-WOLFRAM_API_KEY=your_wolfram_api_key_here
-
-# GitHub Configuration
-GITHUB_TOKEN=your_github_token_here
-
-# Database Configuration
-POSTGRES_CONNECTION_STRING=your_postgres_connection_string_here
-REDIS_URL=your_redis_url_here
-
-# Weather and News Configuration
-OPENWEATHER_API_KEY=your_openweather_api_key_here
-NEWS_API_KEY=your_news_api_key_here
-
-# Google Calendar Configuration
-GOOGLE_CALENDAR_CREDENTIALS=your_google_calendar_credentials_here
-GOOGLE_CALENDAR_TOKEN=your_google_calendar_token_here
-EOF
-    echo "⚠️  Please edit .env file with your actual API keys and tokens"
-fi
+# Stop existing service if running
+echo "🛑 Stopping existing service if running..."
+sudo systemctl stop mcp-hub.service 2>/dev/null || true
 
 # Create systemd service for auto-start with proper Docker configuration
 echo "🔧 Creating systemd service for auto-start..."
@@ -109,6 +98,7 @@ sudo tee /etc/systemd/system/mcp-hub.service > /dev/null << EOF
 Description=MCP Hub Server
 After=network.target docker.service
 Requires=docker.service
+Wants=docker.socket
 
 [Service]
 Type=simple
@@ -117,9 +107,11 @@ Group=docker
 WorkingDirectory=$PROJECT_DIR
 Environment=PATH=$PROJECT_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=DOCKER_HOST=unix:///var/run/docker.sock
+ExecStartPre=/bin/bash -c 'until docker info > /dev/null 2>&1; do sleep 1; done'
 ExecStart=$PROJECT_DIR/venv/bin/python -m mcp_hub.mcp_hub_server --host 0.0.0.0 --port 8000 --load-config
 Restart=always
 RestartSec=10
+TimeoutStartSec=60
 
 [Install]
 WantedBy=multi-user.target
@@ -133,8 +125,9 @@ sudo systemctl enable mcp-hub.service
 echo "🚀 Starting MCP Hub service..."
 sudo systemctl start mcp-hub.service
 
-# Wait a moment for the service to start
-sleep 5
+# Wait for service to start and check status
+echo "⏳ Waiting for service to start..."
+sleep 10
 
 # Check service status
 echo "📊 Checking service status..."
