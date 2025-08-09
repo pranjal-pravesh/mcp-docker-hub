@@ -4,81 +4,129 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCP Hub Management</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🚀 MCP Hub Management</h1>
-            <div class="status-bar">
-                <span id="connection-status" class="status-indicator">Connecting...</span>
-                <button id="refresh-btn" onclick="refreshAll()">🔄 Refresh</button>
-            </div>
+            <h1>�� MCP Hub Management Console</h1>
+            <p>Manage your Docker MCP servers and tools with precision control</p>
         </header>
 
-        <main>
-            <!-- Server Management Section -->
-            <section class="section">
+        <!-- Server Management Section -->
+        <section class="management-section">
+            <div class="section-header">
                 <h2>📡 Server Management</h2>
-                <div class="controls">
-                    <button onclick="startAllServers()" class="btn btn-success">▶️ Start All</button>
-                    <button onclick="stopAllServers()" class="btn btn-danger">⏹️ Stop All</button>
-                    <button onclick="loadConfig()" class="btn btn-primary">📂 Load Config</button>
-                    <button onclick="checkAvailability()" class="btn btn-info">🔍 Check Available</button>
+                <div class="header-actions">
+                    <button id="loadConfigBtn" class="btn btn-primary">Load Config</button>
+                    <button id="checkAvailabilityBtn" class="btn btn-secondary">Check Availability</button>
+                    <button id="startSelectedBtn" class="btn btn-success">Start Selected</button>
+                    <button id="startAllBtn" class="btn btn-success">Start All</button>
+                    <button id="stopAllBtn" class="btn btn-danger">Stop All</button>
                 </div>
-                
-                <div class="server-grid" id="server-grid">
-                    <!-- Servers will be populated here -->
-                </div>
-            </section>
+            </div>
+            
+            <div class="server-grid" id="serverGrid">
+                <!-- Servers will be populated here -->
+            </div>
+        </section>
 
-            <!-- Tools Section -->
-            <section class="section">
-                <h2>🛠️ Available Tools</h2>
-                <div class="controls">
-                    <select id="server-filter" onchange="filterTools()">
+        <!-- Tool Management Section -->
+        <section class="management-section">
+            <div class="section-header">
+                <h2>🛠️ Tool Management</h2>
+                <div class="header-actions">
+                    <button id="refreshToolsBtn" class="btn btn-primary">Refresh Tools</button>
+                    <button id="enableAllToolsBtn" class="btn btn-success">Enable All</button>
+                    <button id="disableAllToolsBtn" class="btn btn-warning">Disable All</button>
+                    <button id="saveToolConfigBtn" class="btn btn-secondary">Save Config</button>
+                </div>
+            </div>
+            
+            <div class="tool-controls">
+                <div class="tool-filters">
+                    <input type="text" id="toolSearch" placeholder="Search tools..." class="search-input">
+                    <select id="serverFilter" class="filter-select">
                         <option value="">All Servers</option>
                     </select>
-                    <input type="text" id="tool-search" placeholder="Search tools..." onkeyup="filterTools()">
                 </div>
-                
-                <div class="tools-grid" id="tools-grid">
-                    <!-- Tools will be populated here -->
+            </div>
+            
+            <!-- Enabled Tools Section -->
+            <div class="tool-section">
+                <h3>✅ Enabled Tools</h3>
+                <div class="tool-list" id="enabledToolsList">
+                    <!-- Enabled tools will be populated here -->
                 </div>
-            </section>
+            </div>
+            
+            <!-- Disabled Tools Section -->
+            <div class="tool-section">
+                <h3>❌ Disabled Tools</h3>
+                <div class="tool-list" id="disabledToolsList">
+                    <!-- Disabled tools will be populated here -->
+                </div>
+            </div>
+        </section>
 
-            <!-- Configuration Section -->
-            <section class="section">
-                <h2>⚙️ Configuration</h2>
-                <div class="config-info">
-                    <div class="config-item">
-                        <strong>Configured Servers:</strong>
-                        <span id="configured-count">-</span>
-                    </div>
-                    <div class="config-item">
-                        <strong>Available Servers:</strong>
-                        <span id="available-count">-</span>
-                    </div>
-                    <div class="config-item">
-                        <strong>Total Tools:</strong>
-                        <span id="total-tools">-</span>
-                    </div>
+        <!-- Status Dashboard -->
+        <section class="management-section">
+            <div class="section-header">
+                <h2>📊 Status Dashboard</h2>
+                <button id="refreshStatusBtn" class="btn btn-primary">Refresh</button>
+            </div>
+            
+            <div class="status-grid">
+                <div class="status-card">
+                    <h3>Active Servers</h3>
+                    <div class="status-number" id="activeServers">0</div>
                 </div>
-            </section>
-        </main>
+                <div class="status-card">
+                    <h3>Total Tools</h3>
+                    <div class="status-number" id="totalTools">0</div>
+                </div>
+                <div class="status-card">
+                    <h3>Enabled Tools</h3>
+                    <div class="status-number" id="enabledTools">0</div>
+                </div>
+                <div class="status-card">
+                    <h3>API Status</h3>
+                    <div class="status-indicator" id="apiStatus">Checking...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration Info -->
+        <section class="management-section">
+            <div class="section-header">
+                <h2>⚙️ Configuration</h2>
+            </div>
+            
+            <div class="config-info">
+                <div class="config-item">
+                    <strong>API Base URL:</strong> <span id="apiBaseUrl">Loading...</span>
+                </div>
+                <div class="config-item">
+                    <strong>Available Servers:</strong> <span id="configuredServers">Loading...</span>
+                </div>
+                <div class="config-item">
+                    <strong>Last Updated:</strong> <span id="lastUpdated">Loading...</span>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <!-- Modal for tool details -->
-    <div id="tool-modal" class="modal">
+    <!-- Tool Details Modal -->
+    <div id="toolModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h3 id="modal-title">Tool Details</h3>
-            <div id="modal-body">
+            <h2 id="modalTitle">Tool Details</h2>
+            <div id="modalContent">
                 <!-- Tool details will be populated here -->
             </div>
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js?v=5"></script>
 </body>
 </html>

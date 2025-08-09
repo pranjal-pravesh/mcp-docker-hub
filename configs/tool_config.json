@@ -1,0 +1,8 @@
+{
+  "enabled_tools": [
+    "slack_post_message",
+    "brave_web_search",
+    "weather"
+  ],
+  "last_updated": "2025-08-09T16:17:55.052595"
+}

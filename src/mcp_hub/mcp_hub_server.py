@@ -29,6 +29,9 @@ class ToolCallRequest(BaseModel):
     arguments: Dict[str, Any] = Field(default_factory=dict, description="Tool arguments")
     timeout: Optional[int] = Field(30, description="Timeout in seconds")
 
+class ToolConfigRequest(BaseModel):
+    enabled_tools: List[str] = Field(..., description="List of enabled tool names")
+
 class ToolCallResponse(BaseModel):
     success: bool
     result: Optional[Dict[str, Any]] = None
@@ -69,6 +72,23 @@ class MCPHubServer:
         self.mcp_manager = MCPManager()
         self.tool_hub = self.mcp_manager.tool_hub
         
+        # Load tool configuration on startup
+        self._load_tool_config()
+        
+    def _load_tool_config(self):
+        """Load tool configuration from file on startup"""
+        try:
+            with open("configs/tool_config.json", "r") as f:
+                config_data = json.load(f)
+                self.mcp_manager.enabled_tools = set(config_data.get("enabled_tools", []))
+                logger.info(f"Loaded tool configuration: {len(self.mcp_manager.enabled_tools)} tools enabled")
+        except FileNotFoundError:
+            logger.info("No tool configuration file found, starting with all tools disabled")
+            self.mcp_manager.enabled_tools = set()
+        except Exception as e:
+            logger.warning(f"Error loading tool configuration: {e}")
+            self.mcp_manager.enabled_tools = set()
+        
         # Create FastAPI app
         self.app = FastAPI(
             title="MCP Hub Server",
@@ -87,8 +107,8 @@ class MCPHubServer:
             allow_headers=["*"],
         )
         
-        # Mount static files
-        self.app.mount("/static", StaticFiles(directory="src/mcp_hub/static"), name="static")
+        # Mount static files with no caching
+        self.app.mount("/static", StaticFiles(directory="src/mcp_hub/static", check_dir=False), name="static")
         
         # Register routes
         self._register_routes()
@@ -101,7 +121,14 @@ class MCPHubServer:
             """Serve the web interface"""
             try:
                 with open("src/mcp_hub/static/index.html", "r") as f:
-                    return HTMLResponse(content=f.read())
+                    return HTMLResponse(
+                        content=f.read(),
+                        headers={
+                            "Cache-Control": "no-cache, no-store, must-revalidate",
+                            "Pragma": "no-cache",
+                            "Expires": "0"
+                        }
+                    )
             except FileNotFoundError:
                 return HTMLResponse(content="""
                 <html>
@@ -138,11 +165,15 @@ class MCPHubServer:
             return servers
         
         @self.app.get("/tools", response_model=List[ToolInfo])
-        async def list_tools():
-            """List all available tools from all servers"""
+        async def list_tools(enabled_only: bool = False):
+            """List available tools from all servers"""
             tools = []
             
             for tool_name, metadata in self.tool_hub.tool_registry.items():
+                # If enabled_only is True, only return enabled tools
+                if enabled_only and tool_name not in self.mcp_manager.enabled_tools:
+                    continue
+                    
                 tools.append(ToolInfo(
                     name=metadata.name,
                     description=metadata.description,
@@ -431,6 +462,43 @@ class MCPHubServer:
                     "servers": availability
                 }
             except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.post("/tools/save-config")
+        async def save_tool_config(request: ToolConfigRequest):
+            """Save tool configuration (which tools are enabled/disabled)"""
+            try:
+                # Store the enabled tools configuration
+                self.mcp_manager.enabled_tools = set(request.enabled_tools)
+                
+                # Save to a configuration file for persistence
+                config_data = {
+                    "enabled_tools": request.enabled_tools,
+                    "last_updated": datetime.now().isoformat()
+                }
+                
+                with open("configs/tool_config.json", "w") as f:
+                    json.dump(config_data, f, indent=2)
+                
+                logger.info(f"Saved tool configuration: {len(request.enabled_tools)} tools enabled")
+                return {"success": True, "enabled_tools_count": len(request.enabled_tools)}
+                
+            except Exception as e:
+                logger.error(f"Error saving tool configuration: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/tools/config")
+        async def get_tool_config():
+            """Get current tool configuration"""
+            try:
+                # Return the current in-memory configuration
+                return {
+                    "enabled_tools": list(self.mcp_manager.enabled_tools),
+                    "last_updated": datetime.now().isoformat()
+                }
+                    
+            except Exception as e:
+                logger.error(f"Error getting tool configuration: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
     
     async def start(self):
