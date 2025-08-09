@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Hub Management</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 MCP Hub Management</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status-indicator">Connecting...</span>
+                <button id="refresh-btn" onclick="refreshAll()">🔄 Refresh</button>
+            </div>
+        </header>
+
+        <main>
+            <!-- Server Management Section -->
+            <section class="section">
+                <h2>📡 Server Management</h2>
+                <div class="controls">
+                    <button onclick="startAllServers()" class="btn btn-success">▶️ Start All</button>
+                    <button onclick="stopAllServers()" class="btn btn-danger">⏹️ Stop All</button>
+                    <button onclick="loadConfig()" class="btn btn-primary">📂 Load Config</button>
+                    <button onclick="checkAvailability()" class="btn btn-info">🔍 Check Available</button>
+                </div>
+                
+                <div class="server-grid" id="server-grid">
+                    <!-- Servers will be populated here -->
+                </div>
+            </section>
+
+            <!-- Tools Section -->
+            <section class="section">
+                <h2>🛠️ Available Tools</h2>
+                <div class="controls">
+                    <select id="server-filter" onchange="filterTools()">
+                        <option value="">All Servers</option>
+                    </select>
+                    <input type="text" id="tool-search" placeholder="Search tools..." onkeyup="filterTools()">
+                </div>
+                
+                <div class="tools-grid" id="tools-grid">
+                    <!-- Tools will be populated here -->
+                </div>
+            </section>
+
+            <!-- Configuration Section -->
+            <section class="section">
+                <h2>⚙️ Configuration</h2>
+                <div class="config-info">
+                    <div class="config-item">
+                        <strong>Configured Servers:</strong>
+                        <span id="configured-count">-</span>
+                    </div>
+                    <div class="config-item">
+                        <strong>Available Servers:</strong>
+                        <span id="available-count">-</span>
+                    </div>
+                    <div class="config-item">
+                        <strong>Total Tools:</strong>
+                        <span id="total-tools">-</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for tool details -->
+    <div id="tool-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modal-title">Tool Details</h3>
+            <div id="modal-body">
+                <!-- Tool details will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Dict, List, Any, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
@@ -85,26 +87,37 @@ class MCPHubServer:
             allow_headers=["*"],
         )
         
+        # Mount static files
+        self.app.mount("/static", StaticFiles(directory="src/mcp_hub/static"), name="static")
+        
         # Register routes
         self._register_routes()
         
     def _register_routes(self):
         """Register all API routes"""
         
-        @self.app.get("/", response_model=HubStatus)
-        async def get_status():
-            """Get hub server status"""
-            uptime = time.time() - self.start_time
-            servers_count = len(self.mcp_manager.active_connections)
-            tools_count = len(self.tool_hub.tool_registry)
-            
-            return HubStatus(
-                status="running",
-                servers_count=servers_count,
-                tools_count=tools_count,
-                uptime=uptime
-            )
-        
+        @self.app.get("/", response_class=HTMLResponse)
+        async def root():
+            """Serve the web interface"""
+            try:
+                with open("src/mcp_hub/static/index.html", "r") as f:
+                    return HTMLResponse(content=f.read())
+            except FileNotFoundError:
+                return HTMLResponse(content="""
+                <html>
+                    <head><title>MCP Hub</title></head>
+                    <body>
+                        <h1>MCP Hub Server</h1>
+                        <p>Server is running! Check the <a href="/docs">API documentation</a>.</p>
+                    </body>
+                </html>
+                """)
+
+        @self.app.get("/health")
+        async def health_check():
+            """Health check endpoint"""
+            return {"status": "healthy", "message": "MCP Hub is running"}
+
         @self.app.get("/servers", response_model=List[ServerInfo])
         async def list_servers():
             """List all MCP servers and their status"""
