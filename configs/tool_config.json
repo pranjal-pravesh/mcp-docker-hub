@@ -1,4 +1,7 @@
 {
-  "enabled_tools": [],
-  "last_updated": "2025-08-09T16:21:51.869852"
+  "enabled_tools": [
+    "slack_list_channels",
+    "query-wolfram-alpha"
+  ],
+  "last_updated": "2025-08-10T19:52:06.444791"
 }

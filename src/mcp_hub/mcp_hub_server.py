@@ -184,6 +184,20 @@ class MCPHubServer:
             
             return tools
         
+        @self.app.get("/tools/config")
+        async def get_tool_config():
+            """Get current tool configuration"""
+            try:
+                # Return the current in-memory configuration
+                return {
+                    "enabled_tools": list(self.mcp_manager.enabled_tools),
+                    "last_updated": datetime.now().isoformat()
+                }
+                    
+            except Exception as e:
+                logger.error(f"Error getting tool configuration: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
         @self.app.get("/tools/{server_name}", response_model=List[ToolInfo])
         async def list_server_tools(server_name: str):
             """List tools from a specific server"""
@@ -485,20 +499,6 @@ class MCPHubServer:
                 
             except Exception as e:
                 logger.error(f"Error saving tool configuration: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
-        @self.app.get("/tools/config")
-        async def get_tool_config():
-            """Get current tool configuration"""
-            try:
-                # Return the current in-memory configuration
-                return {
-                    "enabled_tools": list(self.mcp_manager.enabled_tools),
-                    "last_updated": datetime.now().isoformat()
-                }
-                    
-            except Exception as e:
-                logger.error(f"Error getting tool configuration: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
     
     async def start(self):

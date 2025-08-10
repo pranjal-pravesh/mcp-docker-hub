@@ -62,11 +62,12 @@ class MCPHubManager {
         // Then refresh status to update server cards with correct status
         await this.refreshStatus();
         
+        // Load tool configuration and refresh tools
+        await this.loadToolConfig();
+        await this.refreshTools();
+        
         // Load other data
-        await Promise.all([
-            this.updateConfigurationInfo(),
-            this.loadToolConfig()
-        ]);
+        await this.updateConfigurationInfo();
     }
 
     async loadConfig() {
