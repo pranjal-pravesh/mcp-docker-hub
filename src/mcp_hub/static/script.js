@@ -284,11 +284,17 @@ class MCPHubManager {
     }
 
     async startServer(serverName) {
-        const response = await fetch(`${this.apiBase}/servers/${serverName}/start`, { method: 'POST' });
-        if (!response.ok) throw new Error(`Failed to start ${serverName}`);
-        
-        this.showNotification(`${serverName} started successfully`, 'success');
-        await this.refreshStatus();
+        try {
+            const response = await fetch(`${this.apiBase}/servers/${serverName}/start`, { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to start server');
+            
+            this.showNotification(`Server ${serverName} started successfully`, 'success');
+            await this.refreshStatus();
+            await this.refreshTools();
+            
+        } catch (error) {
+            this.showNotification(`Error starting server: ${error.message}`, 'error');
+        }
     }
 
     async stopServer(serverName) {
