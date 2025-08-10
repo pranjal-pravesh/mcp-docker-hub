@@ -1,8 +1,4 @@
 {
-  "enabled_tools": [
-    "slack_post_message",
-    "brave_web_search",
-    "weather"
-  ],
-  "last_updated": "2025-08-09T16:17:55.052595"
+  "enabled_tools": [],
+  "last_updated": "2025-08-09T16:21:51.869852"
 }

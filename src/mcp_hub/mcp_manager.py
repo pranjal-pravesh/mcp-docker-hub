@@ -628,25 +628,94 @@ class MCPManager:
             return
         
         try:
-            if connection["transport"] == "stdio":
-                process = connection["process"]
-                process.terminate()
-                await process.wait()
+            transport = connection.get("transport", "stdio")
+            
+            if transport == "stdio":
+                # Check if this is a Docker container
+                server_config = self.servers.get(server_name)
+                if server_config and server_config.docker_image:
+                    # This is a Docker container, stop it using docker stop
+                    await self._stop_docker_container(server_name)
+                else:
+                    # This is a regular process, terminate it
+                    process = connection["process"]
+                    process.terminate()
+                    await process.wait()
+            elif transport == "http":
+                # For HTTP servers, we might need to stop Docker containers too
+                server_config = self.servers.get(server_name)
+                if server_config and server_config.docker_image:
+                    await self._stop_docker_container(server_name)
             
             del self.active_connections[server_name]
             if server_name in self.available_tools:
                 del self.available_tools[server_name]
+            
+            # Remove tools from the tool hub registry
+            self.tool_hub.remove_server_tools(server_name)
                 
             self.logger.info(f"Stopped MCP server: {server_name}")
             
         except Exception as e:
             self.logger.error(f"Failed to stop server {server_name}: {e}")
     
+    async def _stop_docker_container(self, server_name: str):
+        """Stop a Docker container for a given server"""
+        try:
+            # Find the container by looking for containers with the server name in their command
+            # or by using a naming convention
+            server_config = self.servers.get(server_name)
+            if not server_config or not server_config.docker_image:
+                return
+            
+            # Use docker ps to find containers running the specific image
+            process = await asyncio.create_subprocess_exec(
+                "docker", "ps", "--filter", f"ancestor={server_config.docker_image}", 
+                "--format", "{{.Names}}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            if process.returncode == 0 and stdout.strip():
+                container_names = stdout.decode().strip().split('\n')
+                for container_name in container_names:
+                    if container_name.strip():
+                        # Stop the container
+                        stop_process = await asyncio.create_subprocess_exec(
+                            "docker", "stop", container_name.strip(),
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE
+                        )
+                        try:
+                            await asyncio.wait_for(stop_process.communicate(), timeout=10.0)
+                            self.logger.info(f"Stopped Docker container: {container_name.strip()}")
+                        except asyncio.TimeoutError:
+                            self.logger.warning(f"Timeout stopping Docker container: {container_name.strip()}")
+                            # Force kill the container
+                            kill_process = await asyncio.create_subprocess_exec(
+                                "docker", "kill", container_name.strip(),
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE
+                            )
+                            await kill_process.communicate()
+                            self.logger.info(f"Force killed Docker container: {container_name.strip()}")
+            else:
+                self.logger.warning(f"No Docker container found for server: {server_name}")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to stop Docker container for {server_name}: {e}")
+    
     async def stop_all_servers(self):
         """Stop all MCP servers"""
         server_names = list(self.active_connections.keys())
         for server_name in server_names:
-            await self.stop_server(server_name) 
+            try:
+                await asyncio.wait_for(self.stop_server(server_name), timeout=10.0)
+            except asyncio.TimeoutError:
+                self.logger.warning(f"Timeout stopping server {server_name}")
+            except Exception as e:
+                self.logger.error(f"Error stopping server {server_name}: {e}")
 
     def remove_server(self, server_name: str) -> bool:
         """Remove an MCP server configuration"""

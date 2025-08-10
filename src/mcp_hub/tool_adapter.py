@@ -424,4 +424,17 @@ class ToolHub:
     
     def list_tools(self) -> List[str]:
         """Get a simple list of all available tool names"""
-        return list(self.tool_registry.keys()) 
+        return list(self.tool_registry.keys())
+    
+    def remove_server_tools(self, server_name: str):
+        """Remove all tools for a specific server from the registry"""
+        tools_to_remove = []
+        for tool_name, metadata in self.tool_registry.items():
+            if metadata.server_name == server_name:
+                tools_to_remove.append(tool_name)
+        
+        for tool_name in tools_to_remove:
+            del self.tool_registry[tool_name]
+            self.logger.info(f"Removed tool from registry: {tool_name}")
+        
+        self.logger.info(f"Removed {len(tools_to_remove)} tools for server: {server_name}") 

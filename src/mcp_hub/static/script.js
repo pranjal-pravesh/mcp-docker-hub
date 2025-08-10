@@ -15,9 +15,9 @@ class MCPHubManager {
         // Server management buttons
         document.getElementById('loadConfigBtn').addEventListener('click', () => this.loadConfig());
         document.getElementById('checkAvailabilityBtn').addEventListener('click', () => this.checkAvailability());
+        document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAllServers());
         document.getElementById('startSelectedBtn').addEventListener('click', () => this.startSelectedServers());
-        document.getElementById('startAllBtn').addEventListener('click', () => this.startAllServers());
-        document.getElementById('stopAllBtn').addEventListener('click', () => this.stopAllServers());
+        document.getElementById('stopSelectedBtn').addEventListener('click', () => this.stopSelectedServers());
 
         // Tool management buttons
         document.getElementById('refreshToolsBtn').addEventListener('click', () => this.refreshTools());
@@ -39,6 +39,20 @@ class MCPHubManager {
         window.addEventListener('click', (e) => {
             if (e.target === modal) this.closeModal();
         });
+    }
+
+    selectAllServers() {
+        // Get all server checkboxes
+        const checkboxes = document.querySelectorAll('.server-checkbox');
+        
+        // Check all checkboxes and add to selected set
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+            const serverName = checkbox.closest('.server-card').dataset.serverName;
+            this.selectedServers.add(serverName);
+        });
+        
+        this.showNotification(`Selected ${this.selectedServers.size} servers`, 'info');
     }
 
     async loadInitialData() {
@@ -240,6 +254,28 @@ class MCPHubManager {
         await this.refreshTools();
     }
 
+    async stopSelectedServers() {
+        const selected = Array.from(this.selectedServers);
+        if (selected.length === 0) {
+            this.showNotification('Please select servers to stop', 'warning');
+            return;
+        }
+
+        this.showNotification(`Stopping ${selected.length} servers...`, 'info');
+        
+        for (const serverName of selected) {
+            try {
+                await this.stopServer(serverName);
+                await new Promise(resolve => setTimeout(resolve, 500)); // Delay between stops
+            } catch (error) {
+                this.showNotification(`Failed to stop ${serverName}: ${error.message}`, 'error');
+            }
+        }
+        
+        await this.refreshStatus();
+        await this.refreshTools();
+    }
+
     async startServer(serverName) {
         const response = await fetch(`${this.apiBase}/servers/${serverName}/start`, { method: 'POST' });
         if (!response.ok) throw new Error(`Failed to start ${serverName}`);
@@ -249,41 +285,16 @@ class MCPHubManager {
     }
 
     async stopServer(serverName) {
-        const response = await fetch(`${this.apiBase}/servers/${serverName}/stop`, { method: 'POST' });
-        if (!response.ok) throw new Error(`Failed to stop ${serverName}`);
-        
-        this.showNotification(`${serverName} stopped successfully`, 'success');
-        await this.refreshStatus();
-    }
-
-    async startAllServers() {
         try {
-            this.showNotification('Starting all servers...', 'info');
+            const response = await fetch(`${this.apiBase}/servers/${serverName}/stop`, { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to stop server');
             
-            const response = await fetch(`${this.apiBase}/servers/start-all`, { method: 'POST' });
-            if (!response.ok) throw new Error('Failed to start all servers');
-            
-            this.showNotification('All servers started successfully', 'success');
+            this.showNotification(`Server ${serverName} stopped successfully`, 'success');
             await this.refreshStatus();
             await this.refreshTools();
             
         } catch (error) {
-            this.showNotification(`Error starting servers: ${error.message}`, 'error');
-        }
-    }
-
-    async stopAllServers() {
-        try {
-            this.showNotification('Stopping all servers...', 'info');
-            
-            const response = await fetch(`${this.apiBase}/servers/stop-all`, { method: 'POST' });
-            if (!response.ok) throw new Error('Failed to stop all servers');
-            
-            this.showNotification('All servers stopped successfully', 'success');
-            await this.refreshStatus();
-            
-        } catch (error) {
-            this.showNotification(`Error stopping servers: ${error.message}`, 'error');
+            this.showNotification(`Error stopping server: ${error.message}`, 'error');
         }
     }
 
