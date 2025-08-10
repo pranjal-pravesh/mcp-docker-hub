@@ -56,9 +56,14 @@ class MCPHubManager {
     }
 
     async loadInitialData() {
+        // Load configuration first to create server cards
+        await this.loadConfig();
+        
+        // Then refresh status to update server cards with correct status
+        await this.refreshStatus();
+        
+        // Load other data
         await Promise.all([
-            this.loadConfig(),
-            this.refreshStatus(),
             this.updateConfigurationInfo(),
             this.loadToolConfig()
         ]);
@@ -74,10 +79,11 @@ class MCPHubManager {
             if (!response.ok) throw new Error('Failed to load configuration');
             
             const result = await response.json();
-            this.showNotification('Configuration loaded successfully!', 'success');
             
             // Load configured servers
             await this.loadConfiguredServers();
+            
+            // Don't show success notification here - wait for status refresh
             
         } catch (error) {
             this.showNotification(`Error loading config: ${error.message}`, 'error');
@@ -554,6 +560,11 @@ class MCPHubManager {
             
             // Update server cards
             this.updateServerCards(servers);
+            
+            // Show success notification for initial load
+            if (servers.length > 0) {
+                this.showNotification(`Loaded ${servers.length} servers successfully!`, 'success');
+            }
             
         } catch (error) {
             document.getElementById('apiStatus').textContent = 'Disconnected';
