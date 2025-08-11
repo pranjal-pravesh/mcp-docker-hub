@@ -166,6 +166,7 @@ python scripts/manage_mcp_servers.py remove --name my-server
 
 ### Tool Management
 - `GET /tools` - List all available tools
+- `GET /tools/qwen` - Get enabled tools in Qwen format (JSON lines)
 - `POST /tools/call` - Call any MCP tool
 - `GET /tools/info/{tool_name}` - Get tool details
 

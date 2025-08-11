@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Dict, List, Any, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -183,6 +183,46 @@ class MCPHubServer:
                 ))
             
             return tools
+        
+        @self.app.get("/tools/qwen")
+        async def get_tools_qwen_format():
+            """
+            Get enabled tools in Qwen format (JSON lines without prompt)
+            
+            Returns:
+                Plain text with one JSON object per line, each containing:
+                {"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}
+                
+            This format is ready to be inserted into a Qwen system prompt between <tools></tools> tags.
+            """
+            qwen_tools = []
+            
+            for tool_name, metadata in self.tool_hub.tool_registry.items():
+                # Only return enabled tools
+                if tool_name not in self.mcp_manager.enabled_tools:
+                    continue
+                
+                # Convert input_schema to parameters format for Qwen
+                parameters = metadata.input_schema.copy()
+                
+                # Create Qwen format tool object
+                qwen_tool = {
+                    "type": "function",
+                    "function": {
+                        "name": metadata.name,
+                        "description": metadata.description,
+                        "parameters": parameters
+                    }
+                }
+                
+                qwen_tools.append(qwen_tool)
+            
+            # Return as plain text with one JSON object per line
+            content = "\n".join(json.dumps(tool) for tool in qwen_tools)
+            return Response(
+                content=content,
+                media_type="text/plain"
+            )
         
         @self.app.get("/tools/config")
         async def get_tool_config():

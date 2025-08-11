@@ -114,6 +114,7 @@ Examples:
     print("  GET  /                    - Server status")
     print("  GET  /servers             - List all servers")
     print("  GET  /tools               - List all tools")
+    print("  GET  /tools/qwen          - Get tools in Qwen format")
     print("  GET  /tools/{server}      - List tools from server")
     print("  GET  /tools/info/{tool}   - Get tool details")
     print("  POST /tools/call          - Call a tool")

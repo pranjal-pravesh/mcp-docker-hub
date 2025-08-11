@@ -1,7 +1,10 @@
 {
   "enabled_tools": [
+    "weather",
     "slack_list_channels",
-    "query-wolfram-alpha"
+    "slack_add_reaction",
+    "query-wolfram-alpha",
+    "slack_post_message"
   ],
-  "last_updated": "2025-08-10T19:52:06.444791"
+  "last_updated": "2025-08-11T20:13:15.980526"
 }
