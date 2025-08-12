@@ -185,9 +185,12 @@ class MCPHubServer:
             return tools
         
         @self.app.get("/tools/qwen")
-        async def get_tools_qwen_format():
+        async def get_tools_qwen_format(required_only: bool = False):
             """
             Get enabled tools in Qwen format (JSON lines without prompt)
+            
+            Args:
+                required_only: If True, only include required parameters in the schema
             
             Returns:
                 Plain text with one JSON object per line, each containing:
@@ -204,6 +207,29 @@ class MCPHubServer:
                 
                 # Convert input_schema to parameters format for Qwen
                 parameters = metadata.input_schema.copy()
+                
+                # If required_only is True, filter to only required parameters
+                if required_only and "properties" in parameters:
+                    required_params = parameters.get("required", [])
+                    if required_params:
+                        # Keep only required properties
+                        filtered_properties = {
+                            key: value for key, value in parameters["properties"].items()
+                            if key in required_params
+                        }
+                        # Create a new parameters object with only required properties
+                        parameters = {
+                            "type": parameters.get("type", "object"),
+                            "properties": filtered_properties,
+                            "required": required_params
+                        }
+                    else:
+                        # If no required params, return empty properties
+                        parameters = {
+                            "type": parameters.get("type", "object"),
+                            "properties": {},
+                            "required": []
+                        }
                 
                 # Create Qwen format tool object
                 qwen_tool = {
