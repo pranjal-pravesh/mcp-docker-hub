@@ -1,8 +1,10 @@
 {
   "enabled_tools": [
+    "calculator",
     "slack_post_message",
+    "weather",
     "query-wolfram-alpha",
-    "weather"
+    "calculate"
   ],
-  "last_updated": "2025-08-12T13:39:00.874363"
+  "last_updated": "2025-08-12T22:17:18.261337"
 }

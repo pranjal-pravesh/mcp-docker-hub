@@ -66,6 +66,11 @@
         "NEWS_API_KEY": "${NEWS_API_KEY}"
       },
       "description": "News API for current events and articles"
+    },
+    "calculator": {
+      "docker_image": "acuvity/mcp-server-calculator",
+      "transport": "stdio",
+      "description": "Calculator server for mathematical operations and computations"
     }
   },
   "metadata": {
